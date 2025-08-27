@@ -39,7 +39,7 @@ jobs:
         env:
           PUBLIC_URL: /priorit.ai
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: './build'
 
