@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
@@ -8,21 +7,13 @@ import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, 
 import MicIcon from '@mui/icons-material/Mic';
 import { CheckCircle as CheckIcon, Delete as DeleteIcon, PlusOneRounded as PlusIcon, Menu as MenuIcon } from '@mui/icons-material';
 
-const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY as string);
+const BE_DOMAIN = (process.env.BE_DOMAIN as string) ?? "";
 
 type Task = {
   task: string;
-//   priority: "high" | "medium" | "low";
   priority: number;
 };
 
-// const fixTaskArray = (arr: any[]): Task[] =>
-//   arr.map((t: any) => ({
-//     task: t.task,
-//     priority: (["high", "medium", "low"].includes(t.priority)
-//       ? t.priority
-//       : "medium") as "high" | "medium" | "low"
-//   }));
 const fixTaskArray = (arr: any[]): Task[] =>
 arr.map((t: any) => ({
     task: t.task,
@@ -113,9 +104,6 @@ const App: React.FC = () => {
     handleCloseMicModal();
   };
 
-  const priorityValue = (p: "high" | "medium" | "low") =>
-  p === "high" ? 2 : p === "medium" ? 1 : 0;
-
 const handleRank = async () => {
   setLoading(true);
   const prompt = `
@@ -130,7 +118,7 @@ priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数�
   `;
 
   try {
-    const response = await fetch("/api/generate", {
+    const response = await fetch(BE_DOMAIN + "/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
@@ -219,7 +207,6 @@ priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数�
         >
           {tasks
             .slice()
-            // .sort((a,b) => priorityValue(b.priority) - priorityValue(a.priority))
             .sort((a, b) => b.priority - a.priority)
             .map((t, i) => (
             <Card style={{marginBottom: 0.5}} key={i}>
