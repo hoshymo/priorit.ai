@@ -116,9 +116,42 @@ const App: React.FC = () => {
   const priorityValue = (p: "high" | "medium" | "low") =>
   p === "high" ? 2 : p === "medium" ? 1 : 0;
 
-  const handleRank = async () => {
-    setLoading(true);
-    const prompt = `
+//   const handleRank = async () => {
+//     setLoading(true);
+//     const prompt = `
+// あなたはタスク管理AIです。以下のタスク一覧に対し、緊急度・重要度・期限などを考慮してpriority（重要度）を1〜100の整数で付けてください。
+// priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数とし、日本語は使わずJSON配列で返してください。
+// 例:
+// [
+//   {"task": "メール返信", "priority": 90},
+//   {"task": "昼ごはん", "priority": 20}
+// ]
+// タスク: ${JSON.stringify(tasks.map(t => t.task))}
+//     `;
+//     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+//     const result = await model.generateContent(prompt);
+//     const text = result.response.text();
+//     console.log("Gemini返答:", text);
+
+//     const jsonMatch = text.match(/\[[\s\S]*\]/);
+//     if (jsonMatch) {
+//       try {
+//         const parsed = fixTaskArray(JSON.parse(jsonMatch[0]));
+//         // const sorted = parsed.sort((a, b) => priorityValue(b.priority) - priorityValue(a.priority));
+//         const sorted = parsed.sort((a, b) => b.priority - a.priority);
+//         setRankedTasks(parsed);
+//         if(user) await saveTasks(user.uid, sorted);
+//       } catch (e) {
+//         alert("LLMの返答をパースできませんでした\n" + text);
+//       }
+//     } else {
+//       alert("LLMの返答からJSON部分が抽出できませんでした\n" + text);
+//     }
+//     setLoading(false);
+//   };
+const handleRank = async () => {
+  setLoading(true);
+  const prompt = `
 あなたはタスク管理AIです。以下のタスク一覧に対し、緊急度・重要度・期限などを考慮してpriority（重要度）を1〜100の整数で付けてください。
 priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数とし、日本語は使わずJSON配列で返してください。
 例:
@@ -127,28 +160,54 @@ priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数�
   {"task": "昼ごはん", "priority": 20}
 ]
 タスク: ${JSON.stringify(tasks.map(t => t.task))}
-    `;
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+  `;
+
+  try {
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+    const data = await response.json();
+
+    // ▼▼▼【修正点】エラーレスポンスを詳細に表示する処理を追加 ▼▼▼
+    if (!response.ok) {
+      console.error("API Error from server:", data);
+      const errorMessage = data.detail?.error?.message || data.error || "不明なエラーです。";
+      alert(`APIリクエストでエラーが発生しました:\n\n${errorMessage}`);
+      setLoading(false);
+      return; // エラー時はここで処理を中断
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     console.log("Gemini返答:", text);
+
+    // candidatesがない場合（ブロックされた場合など）のハンドリング
+    if (!text && data.candidates?.[0]?.finishReason) {
+        alert(`LLMからの返答がありませんでした。\n理由: ${data.candidates[0].finishReason}`);
+        setLoading(false);
+        return;
+    }
 
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (jsonMatch) {
       try {
         const parsed = fixTaskArray(JSON.parse(jsonMatch[0]));
-        // const sorted = parsed.sort((a, b) => priorityValue(b.priority) - priorityValue(a.priority));
         const sorted = parsed.sort((a, b) => b.priority - a.priority);
         setRankedTasks(parsed);
-        if(user) await saveTasks(user.uid, sorted);
+        if (user) await saveTasks(user.uid, sorted);
       } catch (e) {
         alert("LLMの返答をパースできませんでした\n" + text);
       }
     } else {
       alert("LLMの返答からJSON部分が抽出できませんでした\n" + text);
     }
-    setLoading(false);
-  };
+  } catch (err) {
+    console.error("Fetch Error:", err);
+    alert("APIサーバーとの通信に失敗しました。");
+  }
+  setLoading(false);
+};
 
   if (!authChecked) return <div>認証確認中...</div>;
   if (!user) return <LoginButton />;

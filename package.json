@@ -16,6 +16,7 @@
     "@types/node": "^16.18.126",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "axios": "^1.11.0",
     "firebase": "^12.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
@@ -30,6 +31,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
+  "proxy": "http://localhost:3001",
+
   "eslintConfig": {
     "extends": [
       "react-app",
@@ -49,6 +52,7 @@
     ]
   },
   "devDependencies": {
+    "@types/dotenv": "^8.2.3",
     "@types/react-speech-recognition": "^3.9.6"
   }
 }
