@@ -1,39 +1,3 @@
-// const express = require('express');
-// const axios = require('axios');
-// require('dotenv').config();
-
-// const app = express();
-// app.use(express.json());
-
-// app.post('/api/generate', async (req, res) => {
-//   const prompt = req.body.prompt;
-//   try {
-//     const result = await axios.post(
-//       'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + process.env.GEMINI_API_KEY,
-//       {
-//         contents: [
-//           {
-//             role: "user",
-//             parts: [{ text: prompt }]
-//           }
-//         ]
-//       },
-//       {
-//         headers: {
-//           'Content-Type': 'application/json'
-//         }
-//       }
-//     );
-//     res.json(result.data);
-//   } catch (e) {
-//     // エラー詳細をフロントでも見られるようにする
-//     res.status(500).json({ error: e.message, detail: e.response?.data });
-//     console.error("Gemini API Error:", e.message, e.response?.data);
-//   }
-// });
-
-// app.listen(3001, () => console.log('APIサーバー起動'));
-
 require('dotenv').config();
 
 
