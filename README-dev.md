@@ -47,16 +47,35 @@ curl "http://localhost:3001/api/generate" \
   -d '{"prompt": "aaaa"}'
 ```
 
-※ 現状 token verification を skip する方法がないのでちゃんと設定する必要があり、ちょっと面倒です。
+### backend で Firebase auth ID token の検証も動作させる方法
+
+環境変数 GOOGLE_APPLICATION_CREDENTIALS に SA key file の path または file の中身を直接入れておきます。
+key file は Firebase console の設定から取得できます。
+
+```console
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa-key.json
+```
+
+ID token の検証をスキップするにはこの環境変数を unset しておきます。この場合も Authorization header はつけてないと認証エラーになります。
+
+```console
+unset GOOGLE_APPLICATION_CREDENTIALS; export GOOGLE_APPLICATION_CREDENTIALS
+```
+
+また、package.json で npm start したときに以下の環境変数が設定されるようにしているので、これも除外して起動してください。
+
+```console
+PASS_ID_TOKEN_VERIFY=true
+```
 
 ### container build ~ Cloud Run への deploy
 
 GitHub Actions で Artifact Registry へ push、Cloud Run へ deploy するまでのやりかた
 
+これを参考にする
 https://zenn.dev/team_delta/articles/google_cloud_1
 
-
-#### 実行 memo
+#### 実際に上記を実行したときの memo
 
 ```bash
 # RGN=us-central1
@@ -107,6 +126,22 @@ gcloud iam workload-identity-pools providers delete $PROVIDER_NAME \
     --location="global" \
     --workload-identity-pool="$POOL_NAME"
 ```
+
+## Firebase project の追加のしかた
+
+GCP project を新しく set up するときの手順
+
+- Firebase web console から新しく project を追加する
+- 新規の project としてではなく、GCP project に Firebase project を追加する方法を選択する
+- project ができたら以下を有効にする
+  - Authentication
+    - Sign-in method で Google を有効にする
+  - Firestore Database
+    - (default) database をつくる。Rule に、sign-in user のみ読み書きできるルールを追加する
+- Project settings のところから web app を追加し、firebaseConfig を生成して firebase.ts に移す。firebaseConfig: {} のみ移すようにし、周辺のコードはコピペしてこないほうがよい。今後のメンテのことを考えるとそのまま持ってきて動くようにしたほうが良いかもしれない。
+
+※ Cloud Run で ID token verification する project が、frontend から送る ID token を生成する (Firebase Auth で使っている) project とおなじになっている必要がある ("aud" が合っている必要がある) ことに注意。逆の言い方をすると、Cloud Run と Firebase Auth が別 project で動作するようにする場合は何か工夫が必要。
+
 
 ## Troubleshooting
 

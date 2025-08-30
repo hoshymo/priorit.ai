@@ -1,6 +1,9 @@
 on:
   push:
     branches: ['develop']
+    paths:
+      - 'backend/**'
+      - 'Dockerfile'
 
 permissions:
   contents: read
@@ -48,9 +51,21 @@ jobs:
           tags: |
              ${{ env.RGN }}-docker.pkg.dev/${{ env.PRJID }}/${{ env.REPO_NAME }}/${{ env.IMG }}:${{ github.sha }}
              ${{ env.RGN }}-docker.pkg.dev/${{ env.PRJID }}/${{ env.REPO_NAME }}/${{ env.IMG }}:latest
-      - id: 'deploy'
-        uses: 'google-github-actions/deploy-cloudrun@v2'
-        with:
-          service: '${{ env.CRUN_SVC }}'
-          region: '${{ env.RGN }}'
-          image: '${{ env.RGN }}-docker.pkg.dev/${{ env.PRJID }}/${{ env.REPO_NAME }}/${{ env.IMG }}:latest'
+      # google-github-actions/deploy-cloudrun はたいした option が無くイマイチ...
+      # - id: 'deploy'
+      #   uses: 'google-github-actions/deploy-cloudrun@v2'
+      #   with:
+      #     service: '${{ env.CRUN_SVC }}'
+      #     region: '${{ env.RGN }}'
+      #     image: '${{ env.RGN }}-docker.pkg.dev/${{ env.PRJID }}/${{ env.REPO_NAME }}/${{ env.IMG }}:latest'
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.CRUN_SVC }} --region ${{ env.RGN }} \
+            --image ${{ env.RGN }}-docker.pkg.dev/${{ env.PRJID }}/${{ env.REPO_NAME }}/${{ env.IMG }}:latest \
+            --platform managed --allow-unauthenticated \
+            --set-env-vars FE_DOMAIN=https://hoshymo.github.io,REACT_APP_GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }} \
+            --port 3001 --memory 512Mi --cpu 1 --min-instances 0 --max-instances 1
+      - name: Show service URL
+        run: |
+          gcloud run services describe ${{ env.CRUN_SVC }} --region ${{ env.RGN }} \
+            --format 'value(status.url)'
