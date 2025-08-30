@@ -7,17 +7,19 @@ permissions:
   id-token: write
 
 env:
-  PRJID: "hosymo"
+  PRJID: "hoshymo"
   PRJNU: "1064199407438"
   SA_NAME: "ghactions"
-  PROVIDER_NAME: "oidc-gh"
+  POOL_NAME: "ghactions"
+  PROVIDER_NAME: "oidc-gh-1"
   REPO_NAME: "priorit-ai"
   IMG: "backend"
   # RGN: "us-central1"
   RGN: "asia-northeast1"
+  CRUN_SVC: "backend"
 
-jobs: 
-  prod: 
+jobs:
+  prod:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,17 +28,17 @@ jobs:
         id: auth
         uses: 'google-github-actions/auth@v3'
         with:
-          PRJID: '$PRJID'
-          workload_identity_provider: 'projects/$PRJNU/locations/global/workloadIdentityPools/$PROVIDER_NAME/providers/github'
+          project_id: '${{ env.PRJID }}'
+          workload_identity_provider: 'projects/${{ env.PRJNU }}/locations/global/workloadIdentityPools/${{ env.POOL_NAME }}/providers/${{ env.PROVIDER_NAME }}'
           token_format: 'access_token'
-          service_account: '$SA_NAME@$PRJID.iam.gserviceaccount.com'
+          service_account: '${{ env.SA_NAME }}@${{ env.PRJID }}.iam.gserviceaccount.com'
       - name: Docker Auth
         id: docker-auth
         uses: 'docker/login-action@v3'
         with:
           username: 'oauth2accesstoken'
           password: '${{ steps.auth.outputs.access_token }}'
-          registry: '$RGN-docker.pkg.dev'
+          registry: '${{ env.RGN }}-docker.pkg.dev'
       - name: Build, tag and push container
         id: build-image
         uses: docker/build-push-action@v6
@@ -44,11 +46,11 @@ jobs:
           context: '.'
           push: true 
           tags: |
-             $RGN-docker.pkg.dev/$PRJID/$REPO_NAME/$IMG:${{ github.sha }}
-             $RGN-docker.pkg.dev/$PRJID/$REPO_NAME/$IMG:latest
+             ${{ env.RGN }}-docker.pkg.dev/${{ env.PRJID }}/${{ env.REPO_NAME }}/${{ env.IMG }}:${{ github.sha }}
+             ${{ env.RGN }}-docker.pkg.dev/${{ env.PRJID }}/${{ env.REPO_NAME }}/${{ env.IMG }}:latest
       - id: 'deploy'
         uses: 'google-github-actions/deploy-cloudrun@v2'
         with:
-          service: '$SERVICE_NAME'
-          region: '$RGN'
-          image: '$RGN-docker.pkg.dev/$PRJID/$REPO_NAME/$IMG:latest'
+          service: '${{ env.CRUN_SVC }}'
+          region: '${{ env.RGN }}'
+          image: '${{ env.RGN }}-docker.pkg.dev/${{ env.PRJID }}/${{ env.REPO_NAME }}/${{ env.IMG }}:latest'
