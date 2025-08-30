@@ -4,7 +4,7 @@
   "description": "A simple server to interact with the Gemini API.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "PASS_ID_TOKEN_VERIFY=true node server.js"
   },
   "dependencies": {
     "axios": "^1.6.8",

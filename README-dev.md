@@ -47,7 +47,26 @@ curl "http://localhost:3001/api/generate" \
   -d '{"prompt": "aaaa"}'
 ```
 
-※ 現状 token verification を skip する方法がないのでちゃんと設定する必要があり、ちょっと面倒です。
+### backend で Firebase auth ID token の検証も動作させる方法
+
+環境変数 GOOGLE_APPLICATION_CREDENTIALS に SA key file の path または file の中身を直接入れておきます。
+key file は Firebase console の設定から取得できます。
+
+```console
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa-key.json
+```
+
+ID token の検証をスキップするにはこの環境変数を unset しておきます。この場合も Authorization header はつけてないと認証エラーになります。
+
+```console
+unset GOOGLE_APPLICATION_CREDENTIALS; export GOOGLE_APPLICATION_CREDENTIALS
+```
+
+また、package.json で npm start したときに以下の環境変数が設定されるようにしているので、これも除外して起動してください。
+
+```console
+PASS_ID_TOKEN_VERIFY=true
+```
 
 ### container build ~ Cloud Run への deploy
 

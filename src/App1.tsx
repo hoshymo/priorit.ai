@@ -8,7 +8,8 @@ import MicIcon from '@mui/icons-material/Mic';
 import { CheckCircle as CheckIcon, Delete as DeleteIcon, PlusOneRounded as PlusIcon, Menu as MenuIcon } from '@mui/icons-material';
 import { getAuth } from "firebase/auth";
 
-const BE_DOMAIN = (process.env.BE_DOMAIN as string) ?? "http://localhost:3001";
+// const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
+const BE_DOMAIN = (process.env.REACT_APP_BE_DOMAIN as string) ?? "http://localhost:3001";
 
 type Task = {
   task: string;
