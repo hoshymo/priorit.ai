@@ -6,8 +6,9 @@ import { LoginButton } from "./loginbutton";
 import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, DialogTitle, DialogContent, DialogActions, Button} from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import { CheckCircle as CheckIcon, Delete as DeleteIcon, PlusOneRounded as PlusIcon, Menu as MenuIcon } from '@mui/icons-material';
+import { getAuth } from "firebase/auth";
 
-const BE_DOMAIN = (process.env.BE_DOMAIN as string) ?? "";
+const BE_DOMAIN = (process.env.BE_DOMAIN as string) ?? "http://localhost:3001";
 
 type Task = {
   task: string;
@@ -118,9 +119,10 @@ priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数�
   `;
 
   try {
+    const idtoken = await getAuth()?.currentUser?.getIdToken(/* forceRefresh */ false);
     const response = await fetch(BE_DOMAIN + "/api/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Authorization": ("Bearer " + idtoken) },
       body: JSON.stringify({ prompt }),
     });
     const data = await response.json();
