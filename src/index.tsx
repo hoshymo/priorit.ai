@@ -2,7 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App1';
-import reportWebVitals from './reportWebVitals';
 import { UserProvider } from "./Usercontext";
 
 const root = ReactDOM.createRoot(
@@ -15,5 +14,3 @@ root.render(
     </UserProvider>
   </React.StrictMode>
 );
-
-reportWebVitals();
