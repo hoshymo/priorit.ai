@@ -6,8 +6,11 @@ import { LoginButton } from "./loginbutton";
 import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, DialogTitle, DialogContent, DialogActions, Button} from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import { CheckCircle as CheckIcon, Delete as DeleteIcon, PlusOneRounded as PlusIcon, Menu as MenuIcon } from '@mui/icons-material';
+import { getAuth } from "firebase/auth";
+import DriveHelper from "./drive"
 
-const BE_DOMAIN = (process.env.BE_DOMAIN as string) ?? "";
+// const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
+const BE_DOMAIN = (process.env.REACT_APP_BE_DOMAIN as string) ?? "http://localhost:3001";
 
 type Task = {
   task: string;
@@ -43,6 +46,17 @@ const App: React.FC = () => {
       setRankedTasks([]);
     }
   }, [user]);
+
+  const handleMenu = () => {
+    getAuth()?.currentUser?.getIdToken(/* forceRefresh */ false).then((idtoken) => {
+      if (!idtoken)
+        return;
+      const d = new DriveHelper(idtoken);
+      const files = d.listFiles();
+      console.log("debug: files:");
+      console.log(files);
+    });
+  };
 
   const handleStart = () => {
     resetTranscript();
@@ -118,9 +132,10 @@ priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数�
   `;
 
   try {
+    const idtoken = await getAuth()?.currentUser?.getIdToken(/* forceRefresh */ false);
     const response = await fetch(BE_DOMAIN + "/api/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Authorization": ("Bearer " + idtoken) },
       body: JSON.stringify({ prompt }),
     });
     const data = await response.json();
@@ -282,7 +297,7 @@ priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数�
         <IconButton onClick={handleOpenMicModal} color="primary" size="large" aria-label="start voice input">
           <MicIcon />
         </IconButton>
-        <IconButton onClick={handleStart} disabled={listening} color="primary" size="large" aria-label="start voice input">
+        <IconButton onClick={handleMenu} disabled={listening} color="primary" size="large" aria-label="start voice input">
           <MenuIcon />
         </IconButton>
       </Box>
