@@ -3,37 +3,41 @@ import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognitio
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
-import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider} from '@mui/material';
+import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton } from '@mui/material'; // ← ToggleButtonGroup, ToggleButtonを追加
 import MicIcon from '@mui/icons-material/Mic';
-import { CheckCircle as CheckIcon, Delete as DeleteIcon, PlusOneRounded as PlusIcon, Menu as MenuIcon, Edit as EditIcon } from '@mui/icons-material';
+import { CheckCircle as CheckIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 
 const BE_DOMAIN = (process.env.BE_DOMAIN as string) ?? "";
 
+// --- ステップ1: Taskの型定義を変更 ---
 type Task = {
   id: string;
   task: string;
-  priority: number;
+  aiPriority: number;     // ← priorityからaiPriorityに名前変更
+  userPriority?: number;  // ← 追加 (3:高, 2:中, 1:低)
 };
 
+// 既存のデータ変換ロジックも修正
 const fixTaskArray = (arr: any[]): Task[] =>
   arr.map((t: any, index: number) => ({
-    id: t.id || `${Date.now()}-${index}`, // ← idがなければ生成
+    id: t.id || `${Date.now()}-${index}`,
     task: t.task,
-    priority: typeof t.priority === "number" ? t.priority : 50
+    aiPriority: t.priority || t.aiPriority || 50, // ← 互換性のための修正
+    userPriority: t.userPriority, // ← userPriorityを読み込む
   }));
-
 
 
 const App: React.FC = () => {
   const { user, authChecked } = useContext(UserContext);
   const [openMicModal, setOpenMicModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [rankedTasks, setRankedTasks] = useState<Task[]>([]);
+  // rankedTasksは現在使われていないため、一旦コメントアウトまたは削除してもOKです
+  // const [rankedTasks, setRankedTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
-  const [inputTask, setInputTask] = useState(""); // ←追加
+  const [inputTask, setInputTask] = useState("");
   
-    const [editingTask, setEditingTask] = useState<Task | null>(null); // ← 追加
-  const [openEditModal, setOpenEditModal] = useState(false);        // ← 追加
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [openEditModal, setOpenEditModal] = useState(false);
 
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
 
@@ -41,97 +45,68 @@ const App: React.FC = () => {
     if (user) {
       loadTasks(user.uid).then((data) => {
         setTasks(fixTaskArray(data || []));
-        setRankedTasks([]);
       });
     } else {
       setTasks([]);
-      setRankedTasks([]);
     }
   }, [user]);
 
-  const handleStart = () => {
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
-  };
-
-  // 手入力タスク追加
+  // --- タスク追加時のaiPriorityをデフォルト値(50)に設定 ---
   const handleAddTaskManual = async () => {
     if (!user || !inputTask.trim()) return;
-    const newTasks = [
-      ...tasks,
-        { id: Date.now().toString(), task: inputTask.trim(), priority: 50 }
-    ];
+    const newTask = { 
+      id: Date.now().toString(), 
+      task: inputTask.trim(), 
+      aiPriority: 50 // ← aiPriorityとして追加
+    };
+    const newTasks = [...tasks, newTask];
     setTasks(newTasks);
     await saveTasks(user.uid, newTasks);
-    setInputTask(""); // 入力欄クリア
-    setRankedTasks([]);
+    setInputTask("");
   };
 
-  
-  // 音声入力タスク追加
-  const handleAddTaskVoice = async () => {
-    if (!user) return;
-    if (transcript.trim()) {
-      const newTasks = [
-        ...tasks,
-        { id: Date.now().toString(), task: inputTask.trim(), priority: 50 }
-      ];
-      setTasks(newTasks);
-      await saveTasks(user.uid, newTasks);
-      resetTranscript();
-      SpeechRecognition.stopListening();
-      setRankedTasks([]);
-    }
-  };
-
-  // モーダルを開く
-  const handleOpenMicModal = () => {
-    setOpenMicModal(true);
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
-  };
-
-  // モーダルを閉じる
-  const handleCloseMicModal = () => {
-    setOpenMicModal(false);
-    SpeechRecognition.stopListening();
-    resetTranscript();
-  };
-
-  // モーダル内でタスク追加
-const handleAddTaskFromModal = async () => {
+  const handleAddTaskFromModal = async () => {
     if (!user || !transcript.trim()) return;
-    const newTasks = [
-      ...tasks,
-      { id: Date.now().toString(), task: transcript.trim(), priority: 50 } // ← idを追加
-    ];
+    const newTask = {
+      id: Date.now().toString(),
+      task: transcript.trim(),
+      aiPriority: 50 // ← aiPriorityとして追加
+    };
+    const newTasks = [...tasks, newTask];
     setTasks(newTasks);
     await saveTasks(user.uid, newTasks);
     handleCloseMicModal();
   };
 
-  // タスク削除機能
-  const handleDeleteTask = async (taskId: string) => { // ← 追加
+  // --- ステップ2: ユーザー優先度を更新する関数 ---
+  const handleSetUserPriority = async (taskId: string, priority: number) => { // ← 追加
+    if (!user) return;
+    const newTasks = tasks.map(task => 
+      task.id === taskId ? { ...task, userPriority: priority } : task
+    );
+    setTasks(newTasks);
+    await saveTasks(user.uid, newTasks);
+  };
+  
+  // --- 既存の関数群 (一部修正) ---
+  const handleDeleteTask = async (taskId: string) => {
     if (!user) return;
     const newTasks = tasks.filter(task => task.id !== taskId);
     setTasks(newTasks);
     await saveTasks(user.uid, newTasks);
   };
 
-  // 編集モーダルを開く
-  const handleOpenEditModal = (task: Task) => { // ← 追加
-    setEditingTask({ ...task }); // 変更用にタスクのコピーをセット
+  const handleOpenEditModal = (task: Task) => {
+    setEditingTask({ ...task });
     setOpenEditModal(true);
   };
 
-  // 編集モーダルを閉じる
-  const handleCloseEditModal = () => { // ← 追加
+  const handleCloseEditModal = () => {
     setOpenEditModal(false);
     setEditingTask(null);
   };
 
-  // タスクの更新を保存
-  const handleUpdateTask = async () => { // ← 追加
+  const handleUpdateTask = async () => {
     if (!user || !editingTask) return;
     const newTasks = tasks.map(task => 
       task.id === editingTask.id ? editingTask : task
@@ -141,74 +116,80 @@ const handleAddTaskFromModal = async () => {
     handleCloseEditModal();
   };
   
-  // 編集中のタスク内容を変更
-  const handleEditInputChange = (event: React.ChangeEvent<HTMLInputElement>) => { // ← 追加
+  const handleEditInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!editingTask) return;
     setEditingTask({ ...editingTask, task: event.target.value });
   };
   
-  // 編集中のタスク優先度を変更
-  const handleEditPriorityChange = (event: Event, newValue: number | number[]) => { // ← 追加
+// 編集中のタスクの「ユーザー優先度」をスライダーで変更するためのハンドラ
+    const handleEditUserPriorityChange = (event: Event, newValue: number | number[]) => {
     if (!editingTask) return;
-    setEditingTask({ ...editingTask, priority: newValue as number });
+    setEditingTask({ ...editingTask, userPriority: newValue as number });
+    };
+
+  const handleCloseMicModal = () => {
+    setOpenMicModal(false);
+    SpeechRecognition.stopListening();
+    resetTranscript();
+  };
+  
+  const handleOpenMicModal = () => {
+    setOpenMicModal(true);
+    resetTranscript();
+    SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
   };
 
-const handleRank = async () => {
-  setLoading(true);
-  const prompt = `
-あなたはタスク管理AIです。以下のタスク一覧に対し、緊急度・重要度・期限などを考慮してpriority（重要度）を1〜100の整数で付けてください。
-priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数とし、日本語は使わずJSON配列で返してください。
+  // --- LLMの優先度付け機能を修正 ---
+  const handleRank = async () => {
+    if (!user) return;
+    setLoading(true);
+    const prompt = `
+あなたはタスク管理AIです。以下のタスク一覧に対し、緊急度・重要度・期限などを考慮してaiPriority（AIによる重要度）を1〜100の整数で付けてください。
+aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数とし、日本語は使わずJSON配列で返してください。
 例:
 [
-  {"task": "メール返信", "priority": 90},
-  {"task": "昼ごはん", "priority": 20}
+  {"task": "メール返信", "aiPriority": 90},
+  {"task": "昼ごはん", "aiPriority": 20}
 ]
 タスク: ${JSON.stringify(tasks.map(t => t.task))}
   `;
 
   try {
+    const token = await user.getIdToken();
     const response = await fetch(BE_DOMAIN + "/api/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` // 認証トークンを追加
+      },
       body: JSON.stringify({ prompt }),
     });
     const data = await response.json();
 
-    // ▼▼▼【修正点】エラーレスポンスを詳細に表示する処理を追加 ▼▼▼
     if (!response.ok) {
       console.error("API Error from server:", data);
-      const errorMessage = data.detail?.error?.message || data.error || "不明なエラーです。";
-      alert(`APIリクエストでエラーが発生しました:\n\n${errorMessage}`);
-      setLoading(false);
-      return; // エラー時はここで処理を中断
+      throw new Error(data.detail?.error?.message || data.error || "不明なエラーです。");
     }
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    console.log("Gemini返答:", text);
-
-    // candidatesがない場合（ブロックされた場合など）のハンドリング
-    if (!text && data.candidates?.[0]?.finishReason) {
-        alert(`LLMからの返答がありませんでした。\n理由: ${data.candidates[0].finishReason}`);
-        setLoading(false);
-        return;
-    }
-
     const jsonMatch = text.match(/\[[\s\S]*\]/);
+
     if (jsonMatch) {
-      try {
-        const parsed = fixTaskArray(JSON.parse(jsonMatch[0]));
-        const sorted = parsed.sort((a, b) => b.priority - a.priority);
-        setRankedTasks(parsed);
-        if (user) await saveTasks(user.uid, sorted);
-      } catch (e) {
-        alert("LLMの返答をパースできませんでした\n" + text);
-      }
+      const parsedResults: { task: string; aiPriority: number }[] = JSON.parse(jsonMatch[0]);
+      
+      // AIの返却結果を既存のタスクにマージする
+      const newTasks = tasks.map(originalTask => {
+        const rankedTask = parsedResults.find(p => p.task === originalTask.task);
+        return rankedTask ? { ...originalTask, aiPriority: rankedTask.aiPriority } : originalTask;
+      });
+      
+      setTasks(newTasks);
+      await saveTasks(user.uid, newTasks);
     } else {
       alert("LLMの返答からJSON部分が抽出できませんでした\n" + text);
     }
   } catch (err) {
-    console.error("Fetch Error:", err);
-    alert("APIサーバーとの通信に失敗しました。");
+    alert(`APIリクエストでエラーが発生しました:\n\n${err}`);
   }
   setLoading(false);
 };
@@ -218,180 +199,143 @@ priorityは必ず1（最も低い）〜100（最も高い）の範囲の整数�
 
   return (
     <div style={{ maxWidth: 480, margin: "2em auto", fontFamily: "sans-serif" }}>
-      {/* <h2>音声タスク管理（Gemini LLM連携）</h2> */}
-      <div style={{ marginBottom: 16 }}>
-        <input
-          type="text"
+      {/* --- 入力フォーム --- */}
+      <div style={{ marginBottom: 16, display: 'flex' }}>
+        <TextField
           value={inputTask}
           onChange={e => setInputTask(e.target.value)}
           placeholder="タスクを手入力"
-          style={{ marginRight: 8 }}
+          variant="outlined"
+          size="small"
+          fullWidth
         />
-        <button onClick={handleAddTaskManual} disabled={!inputTask.trim()}>
-          手入力でタスク追加
-        </button>
+        <Button onClick={handleAddTaskManual} disabled={!inputTask.trim()} variant="contained" sx={{ ml: 1 }}>追加</Button>
       </div>
-      <div style={{ marginBottom: 16 }}>
-        {/* <button onClick={handleStart} disabled={listening}>🎤 音声入力</button> */}
-        {/* <button onClick={handleAddTaskVoice} disabled={!transcript}>タスク追加</button> */}
-        <span style={{ marginLeft: 8, color: listening ? "green" : "gray" }}>
-          {listening ? "録音中..." : ""}
-        </span>
-        <div style={{ marginTop: 8, minHeight: 24 }}>{transcript}
-          <IconButton onClick={handleAddTaskVoice} disabled={!transcript} color="primary" size="large" aria-label="add task">
-            <CheckIcon />
-          </IconButton>
-        </div>
-      </div>
-<div>
-        <Box
-          sx={{
-            width: '100%',
-            display: 'grid',
-            gridTemplateRows: 'repeat(auto-fill, 1fr)',
-            borderRadius: 1,
-            gap: 1,
-          }}
-        >
+
+      {/* --- タスク一覧 --- */}
+      <div>
+        <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
           {tasks
-            .slice() // ソート前に配列をコピー
-            .sort((a, b) => b.priority - a.priority)
-            .map((t) => ( // ← keyにインデックスではなくtask.idを使用
+            // --- ステップ3: 新しいソートロジック ---
+            .slice()
+            // .sort((a, b) => {
+            //   const userPriorityA = a.userPriority || 1; // 未設定は「低」として扱う
+            //   const userPriorityB = b.userPriority || 1;
+            //   if (userPriorityB !== userPriorityA) {
+            //     return userPriorityB - userPriorityA; // ユーザー優先度で降順ソート
+            //   }
+            //   return b.aiPriority - a.aiPriority; // AI優先度で降順ソート
+            // })
+            .sort((a, b) => {
+            const totalPriorityA = (a.userPriority || 50) + a.aiPriority;
+            const totalPriorityB = (b.userPriority || 50) + b.aiPriority;
+            
+            return totalPriorityB - totalPriorityA;
+            })
+            .map((t) => (
             <Card style={{marginBottom: 0.5}} key={t.id}>
-              <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                   <Typography variant="h6" component="div">
                     {t.task}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    優先度: {t.priority}
-                  </Typography>
+                  <Box>
+                    <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
+                    <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
+                  </Box>
                 </Box>
-                <Box>
-                  {/* --- 編集・削除ボタン --- */}
-                  <IconButton onClick={() => handleOpenEditModal(t)} color="default" aria-label="edit task">
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" aria-label="delete task">
-                    <DeleteIcon />
-                  </IconButton>
-                </Box>
+                
+                <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                AI優先度: {t.aiPriority}
+                
+                {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
+                {t.userPriority != null && (
+                    <Box component="span" sx={{ 
+                    color: '#1976d2', // MUIのデフォルトの青色
+                    fontWeight: 'bold',
+                    ml: 1 // marginLeft
+                    }}>
+                    ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
+                    </Box>
+                )}
+                </Typography>                
+                {/* --- ユーザー優先度設定UI --- */}
+                {/* <Box sx={{ mt: 1 }}>
+                  <ToggleButtonGroup
+                    value={t.userPriority}
+                    exclusive
+                    size="small"
+                    onChange={(event, newPriority) => {
+                      if (newPriority !== null) {
+                        handleSetUserPriority(t.id, newPriority);
+                      }
+                    }}
+                  >
+                    <ToggleButton value={3} color="error">高</ToggleButton>
+                    <ToggleButton value={2} color="warning">中</ToggleButton>
+                    <ToggleButton value={1} color="success">低</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box> */}
+
               </CardContent>
             </Card>
           ))}
         </Box>
       </div>
 
-      <button onClick={handleRank} disabled={tasks.length === 0 || loading}>
+      <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
         {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
-      </button>
+      </Button>
 
-      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, }}>
-        <IconButton onClick={handleOpenMicModal} color="primary" size="large" aria-label="start voice input" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#f0f0f0' }}}>
+      {/* --- 右下固定ボタン --- */}
+      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}>
+        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#f0f0f0' }}}>
           <MicIcon fontSize="large" />
         </IconButton>
       </Box>
-      {rankedTasks.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <h3>優先度順タスクリスト</h3>
-          <ol>
-            {rankedTasks.map((t, i) => (
-              <li key={i}>
-                <span style={{ fontWeight: "bold" }}>{t.task}</span>
-                <span style={{
-                  marginLeft: 8,
-                  color:
-                    t.priority >= 80 ? "red" :
-                    t.priority >= 50 ? "orange" :
-                    t.priority >= 20 ? "gray" : "black"
-                }}>
-                  [priority: {t.priority}]
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
-      )}
-      {/* 画面右下固定でボタンを表示する */}
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: 20,
-          right: 20,
-          zIndex: 1000,
-        }}
-      >
-        {/* <IconButton onClick={handleOpenMicModal} color="primary" size="large" aria-label="start voice input">
-          <MicIcon />
-        </IconButton>
-        <IconButton onClick={handleStart} disabled={listening} color="primary" size="large" aria-label="start voice input">
-          <MenuIcon />
-        </IconButton> */}
-      </Box>
 
+      {/* --- 音声入力モーダル --- */}
       <Dialog open={openMicModal} onClose={handleCloseMicModal} fullWidth>
         <DialogTitle>音声入力でタスク追加</DialogTitle>
         <DialogContent>
-          {!browserSupportsSpeechRecognition && (
-            <Typography color="error">このブラウザは音声認識に対応していません</Typography>
-          )}
-          <Typography variant="subtitle1" sx={{ mt: 2 }}>
-            {listening ? "録音中..." : ""}
-          </Typography>
-          <Typography variant="body1" sx={{ mt: 2, minHeight: 28 }}>
-            {transcript}
-          </Typography>
+          <Typography variant="subtitle1" sx={{ mt: 2 }}>{listening ? "録音中..." : "マイクに向かって話してください"}</Typography>
+          <Typography variant="body1" sx={{ mt: 2, minHeight: 28 }}>{transcript}</Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseMicModal}>キャンセル</Button>
-          <Button 
-            onClick={handleAddTaskFromModal} 
-            disabled={!transcript.trim()}
-            color="primary"
-            variant="contained"
-            startIcon={<CheckIcon />}
-          >
-            タスク追加
-          </Button>
+          <Button onClick={handleAddTaskFromModal} disabled={!transcript.trim()} color="primary" variant="contained" startIcon={<CheckIcon />}>タスク追加</Button>
         </DialogActions>
       </Dialog>
+      
+      {/* --- 編集モーダル --- */}
       <Dialog open={openEditModal} onClose={handleCloseEditModal} fullWidth>
         <DialogTitle>タスクの編集</DialogTitle>
         <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="タスク内容"
-            type="text"
-            fullWidth
-            variant="standard"
-            value={editingTask?.task || ""}
-            onChange={handleEditInputChange}
-            sx={{ mb: 4 }}
-          />
-          <Typography gutterBottom>優先度: {editingTask?.priority}</Typography>
-          <Slider
-            value={editingTask?.priority || 50}
-            onChange={handleEditPriorityChange}
-            aria-labelledby="priority-slider"
+          <TextField autoFocus margin="dense" label="タスク内容" type="text" fullWidth variant="standard" value={editingTask?.task || ""} onChange={handleEditInputChange} sx={{ mb: 4 }} />
+            <Typography gutterBottom>ユーザー優先度: {editingTask?.userPriority || '未設定'}</Typography>
+            <Slider
+            value={editingTask?.userPriority || 50} // 未設定なら中央値の50を表示
+            onChange={handleEditUserPriorityChange}  // 上で用意したハンドラを紐付け
+            aria-labelledby="user-priority-slider"
             valueLabelDisplay="auto"
             step={1}
             marks
-            min={1}
+            min={0}
             max={100}
-          />
+            />         
+            {/* <Slider value={editingTask?.aiPriority || 50} onChange={handleEditPriorityChange} valueLabelDisplay="auto" step={1} marks min={1} max={100} /> */}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseEditModal}>キャンセル</Button>
-          <Button 
+            <Button onClick={handleCloseEditModal}>キャンセル</Button>
+            <Button 
             onClick={handleUpdateTask} 
             color="primary"
             variant="contained"
-          >
+            >
             保存する
-          </Button>
-        </DialogActions>
-      </Dialog>
+            </Button>
+        </DialogActions>      
+        </Dialog>
     </div>
   );
 };
