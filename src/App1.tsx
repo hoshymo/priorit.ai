@@ -3,13 +3,12 @@ import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognitio
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
-import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse } from '@mui/material'; // ← ToggleButtonGroup, ToggleButtonを追加
-import MicIcon from '@mui/icons-material/Mic';
-import { CheckCircle as CheckIcon, Delete as DeleteIcon, PlusOneRounded as PlusIcon, Menu as MenuIcon } from '@mui/icons-material';
+import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse } from './import-mui';
+import { CheckIcon, DeleteIcon, PlusIcon, MenuIcon, MicIcon } from './import-mui';
 import { getAuth } from "firebase/auth";
 
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
-const BE_DOMAIN = (process.env.REACT_APP_BE_DOMAIN as string) ?? "http://localhost:3001";
+const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
 
 // --- ステップ1: Taskの型定義を変更 ---
 type Task = {

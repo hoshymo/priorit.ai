@@ -41,7 +41,7 @@ jobs:
       # - name: Install dependencies
       #   run: npm install
       - name: Build
-        run: npm ci && REACT_APP_BE_DOMAIN=${{ env.BE_DOMAIN }} npm run build
+        run: npm ci && VITE_BE_DOMAIN=${{ env.BE_DOMAIN }} npm run build
         env:
           PUBLIC_URL: /priorit.ai
       - name: Upload artifact
