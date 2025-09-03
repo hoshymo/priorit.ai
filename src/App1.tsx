@@ -5,9 +5,11 @@ import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
 import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse } from '@mui/material'; // ← ToggleButtonGroup, ToggleButtonを追加
 import MicIcon from '@mui/icons-material/Mic';
-import { CheckCircle as CheckIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
+import { CheckCircle as CheckIcon, Delete as DeleteIcon, PlusOneRounded as PlusIcon, Menu as MenuIcon } from '@mui/icons-material';
+import { getAuth } from "firebase/auth";
 
-const BE_DOMAIN = (process.env.BE_DOMAIN as string) ?? "";
+// const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
+const BE_DOMAIN = (process.env.REACT_APP_BE_DOMAIN as string) ?? "http://localhost:3001";
 
 // --- ステップ1: Taskの型定義を変更 ---
 type Task = {
@@ -157,12 +159,12 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
   `;
 
   try {
-    const token = await user.getIdToken();
+    const idtoken = await getAuth()?.currentUser?.getIdToken(/* forceRefresh */ false);
     const response = await fetch(BE_DOMAIN + "/api/generate", {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}` // 認証トークンを追加
+        "Authorization": `Bearer ${idtoken}` // 認証トークンを追加
       },
       body: JSON.stringify({ prompt }),
     });
