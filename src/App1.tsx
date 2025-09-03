@@ -3,7 +3,7 @@ import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognitio
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
-import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton } from '@mui/material'; // ← ToggleButtonGroup, ToggleButtonを追加
+import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse } from '@mui/material'; // ← ToggleButtonGroup, ToggleButtonを追加
 import MicIcon from '@mui/icons-material/Mic';
 import { CheckCircle as CheckIcon, Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 
@@ -40,6 +40,8 @@ const App: React.FC = () => {
   const [openEditModal, setOpenEditModal] = useState(false);
 
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
+
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -212,77 +214,111 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         <Button onClick={handleAddTaskManual} disabled={!inputTask.trim()} variant="contained" sx={{ ml: 1 }}>追加</Button>
       </div>
 
-      {/* --- タスク一覧 --- */}
-      <div>
+
+        <div>
         <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
-          {tasks
-            // --- ステップ3: 新しいソートロジック ---
-            .slice()
-            // .sort((a, b) => {
-            //   const userPriorityA = a.userPriority || 1; // 未設定は「低」として扱う
-            //   const userPriorityB = b.userPriority || 1;
-            //   if (userPriorityB !== userPriorityA) {
-            //     return userPriorityB - userPriorityA; // ユーザー優先度で降順ソート
-            //   }
-            //   return b.aiPriority - a.aiPriority; // AI優先度で降順ソート
-            // })
-            .sort((a, b) => {
-            const totalPriorityA = (a.userPriority || 50) + a.aiPriority;
-            const totalPriorityB = (b.userPriority || 50) + b.aiPriority;
-            
-            return totalPriorityB - totalPriorityA;
-            })
-            .map((t) => (
-            <Card style={{marginBottom: 0.5}} key={t.id}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="h6" component="div">
-                    {t.task}
-                  </Typography>
-                  <Box>
-                    <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                    <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
-                  </Box>
-                </Box>
-                
-                <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                AI優先度: {t.aiPriority}
-                
-                {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
-                {t.userPriority != null && (
-                    <Box component="span" sx={{ 
-                    color: '#1976d2', // MUIのデフォルトの青色
-                    fontWeight: 'bold',
-                    ml: 1 // marginLeft
-                    }}>
-                    ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
-                    </Box>
+            {(() => {
+            // 事前にソート済みのタスク配列を準備
+            const sortedTasks = tasks
+                .slice()
+                .sort((a, b) => {
+                const userPriorityA = a.userPriority || 50; // 未設定は中間値として扱う
+                const userPriorityB = b.userPriority || 50;
+                const totalPriorityA = userPriorityA + a.aiPriority;
+                const totalPriorityB = userPriorityB + b.aiPriority;
+                return totalPriorityB - totalPriorityA;
+                });
+
+            const topTasks = sortedTasks.slice(0, 3);
+            const remainingTasks = sortedTasks.slice(3);
+
+            return (
+                <>
+                {/* --- TOP3タスクの表示 --- */}
+                {topTasks.map((t) => (
+                    <Card style={{marginBottom: 0.5}} key={t.id}>
+                        <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Typography variant="h6" component="div">
+                                {t.task}
+                            </Typography>
+                            <Box>
+                                <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
+                                <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
+                            </Box>
+                            </Box>
+                            
+                            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                            AI優先度: {t.aiPriority}
+                            
+                            {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
+                            {t.userPriority != null && (
+                                <Box component="span" sx={{ 
+                                color: '#1976d2', // MUIのデフォルトの青色
+                                fontWeight: 'bold',
+                                ml: 1 // marginLeft
+                                }}>
+                                ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
+                                </Box>
+                            )}
+                            </Typography>                
+                        </CardContent>
+                </Card>
+                ))}
+
+                {/* --- 4件目以降のタスクをCollapseで囲む --- */}
+                {remainingTasks.length > 0 && (
+                    <>
+                    <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                        <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
+                        {remainingTasks.map((t) => (
+                            <Card style={{marginBottom: 0.5}} key={t.id}>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                    <Typography variant="h6" component="div">
+                                        {t.task}
+                                    </Typography>
+                                    <Box>
+                                        <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
+                                        <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
+                                    </Box>
+                                    </Box>
+                                    
+                                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                                    AI優先度: {t.aiPriority}
+                                    
+                                    {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
+                                    {t.userPriority != null && (
+                                        <Box component="span" sx={{ 
+                                        color: '#1976d2', // MUIのデフォルトの青色
+                                        fontWeight: 'bold',
+                                        ml: 1 // marginLeft
+                                        }}>
+                                        ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
+                                        </Box>
+                                    )}
+                                    </Typography>                
+                                </CardContent>
+                            </Card>
+                        ))}
+                        </Box>
+                    </Collapse>
+                    
+                    {/* --- 開閉ボタン --- */}
+                    <Button 
+                        onClick={() => setIsExpanded(!isExpanded)} 
+                        fullWidth 
+                        sx={{ mt: 1 }}
+                    >
+                        {isExpanded ? '閉じる' : `残り${remainingTasks.length}件を見る`}
+                    </Button>
+                    </>
                 )}
-                </Typography>                
-                {/* --- ユーザー優先度設定UI --- */}
-                {/* <Box sx={{ mt: 1 }}>
-                  <ToggleButtonGroup
-                    value={t.userPriority}
-                    exclusive
-                    size="small"
-                    onChange={(event, newPriority) => {
-                      if (newPriority !== null) {
-                        handleSetUserPriority(t.id, newPriority);
-                      }
-                    }}
-                  >
-                    <ToggleButton value={3} color="error">高</ToggleButton>
-                    <ToggleButton value={2} color="warning">中</ToggleButton>
-                    <ToggleButton value={1} color="success">低</ToggleButton>
-                  </ToggleButtonGroup>
-                </Box> */}
-
-              </CardContent>
-            </Card>
-          ))}
+                </>
+            );
+            })()}
         </Box>
-      </div>
-
+        </div>
       <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
         {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
       </Button>
