@@ -5,6 +5,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: ['develop']
+    paths:
+      - 'src/**'
+      - 'package-lock.json'
 
   workflow_dispatch:
 
@@ -12,6 +15,9 @@ permissions:
   contents: read
   pages: write
   id-token: write
+
+env:
+  BE_DOMAIN: "https://backend-1064199407438.asia-northeast1.run.app"
 
 concurrency:
   group: 'pages'
@@ -35,7 +41,7 @@ jobs:
       # - name: Install dependencies
       #   run: npm install
       - name: Build
-        run: npm ci && npm run build
+        run: npm ci && VITE_BE_DOMAIN=${{ env.BE_DOMAIN }} npm run build
         env:
           PUBLIC_URL: /priorit.ai
       - name: Upload artifact

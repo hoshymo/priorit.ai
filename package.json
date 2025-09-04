@@ -9,34 +9,41 @@
     "@mui/icons-material": "^7.3.1",
     "@mui/material": "^7.3.1",
     "axios": "^1.11.0",
-    "firebase": "^12.1.0",
+    "date-fns": "^4.1.0",
+    "firebase": "^12.2.1",
     "react": "^19.1.1",
+    "react-big-calendar": "^1.19.4",
     "react-dom": "^19.1.1",
     "react-speech-recognition": "^4.0.1",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "vite": "^7.1.4",
+    "vite-plugin-svgr": "^4.5.0",
+    "web-vitals": "^5.1.0"
   },
   "devDependencies": {
-    "typescript": "^4.9.5",
-    "@types/dotenv": "^8.2.3",
-    "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.126",
-    "@types/react": "^19.1.10",
-    "@types/react-dom": "^19.1.7",
-    "@types/react-speech-recognition": "^3.9.6",
     "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.7.0",
+    "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^13.5.0"
+    "@testing-library/user-event": "^14.6.1",
+    "@types/dotenv": "^8.2.3",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.12",
+    "@types/react-big-calendar": "^1.16.2",
+    "@types/react-dom": "^19.1.9",
+    "@types/react-speech-recognition": "^3.9.6",
+    "@types/testing-library__dom": "^7.0.2",
+    "@vitejs/plugin-react-swc": "^4.0.1",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "vite dev",
+    "build": "tsc && vite build",
+    "serve": "vite preview",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage --watch=false"
   },
-  "proxy": "http://localhost:3001",
-
   "eslintConfig": {
     "extends": [
       "react-app",

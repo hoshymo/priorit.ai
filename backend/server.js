@@ -1,16 +1,56 @@
 require('dotenv').config();
-
+const cors = require('cors');
+const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
 
 const express = require('express');
 const axios = require('axios');
 
+const FE_DOMAIN = process.env.FE_DOMAIN ?? "http://localhost:3000";
 console.log('読み込まれたAPIキー:', process.env.REACT_APP_GEMINI_API_KEY);
+const passIdTokenVerify = process.env.PASS_ID_TOKEN_VERIFY === 'true';
+if (passIdTokenVerify) {
+  console.log("Skipping ID token verification...");
+}
+
 const app = express();
+app.use(cors({
+  origin: FE_DOMAIN,
+  credentials: false
+}));
 app.use(express.json());
 
+const fb = initializeApp({
+  // credential: admin.credential.applicationDefault(),
+});
+console.log(fb);
+
 app.post('/api/generate', async (req, res) => {
-  const prompt = req.body.prompt;
+
+  // Take user's ID token from Authorization header
+  const idToken = req.headers.authorization?.split('Bearer ')[1];
+  if (!idToken) {
+    console.log("Request without ID token");
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!passIdTokenVerify) {
+    // Verify Firebase auth token
+    var uid = null;
+    await admin.auth().verifyIdToken(idToken)
+      .then((decodedToken) => {
+        uid = decodedToken.uid;
+        console.log("Request by: ", decodedToken.user_id);
+      })
+      .catch((error) => {
+        console.error("Error verifying ID token:", error);
+      });
+    if (!uid) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+
   try {
+    const prompt = req.body.prompt;
     const result = await axios.post(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + process.env.REACT_APP_GEMINI_API_KEY,
       {
