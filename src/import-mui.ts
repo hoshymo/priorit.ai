@@ -24,4 +24,5 @@ export { default as EditIcon } from '@mui/icons-material/Edit';
 export { default as MenuIcon } from '@mui/icons-material/Menu';
 export { default as MicIcon } from '@mui/icons-material/Mic';
 export { default as PlusIcon } from '@mui/icons-material/PlusOneRounded';
+export { default as GoogleIcon } from '@mui/icons-material/Google';
 // #endregion

@@ -3,6 +3,7 @@ import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognitio
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
+import { keyframes, styled } from '@mui/material/styles';
 import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse } from './import-mui';
 import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, MenuIcon, MicIcon } from './import-mui';
 import { getAuth } from "firebase/auth";
@@ -233,11 +234,57 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             const topTasks = sortedTasks.slice(0, 3);
             const remainingTasks = sortedTasks.slice(3);
 
+            const rainbowSpin = keyframes`
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            `;
+            const AnimatedCard = styled(Card)(({ theme }) => ({
+              position: 'relative',
+              zIndex: 0,
+              borderRadius: theme.shape.borderRadius,
+              padding: theme.spacing(2),
+              overflow: 'hidden',
+              // 枠の背景を回転させる擬似要素
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: '-819px',
+                left: '-819px',
+                right: '-819px',
+                bottom: '-819px',
+                borderRadius: 'inherit',
+                padding: '4px',
+                background: 'conic-gradient(red, orange, indigo, violet, red)',
+                // background: 'conic-gradient(red, orange, yellow, green, blue, indigo, violet, red)',
+                animation: `${rainbowSpin} 12s linear infinite`,
+                zIndex: -1,
+              },
+              // 枠の内側に白背景を重ねて中身を静止させる
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 4,
+                left: 4,
+                right: 4,
+                bottom: 4,
+                borderRadius: 'inherit',
+                backgroundColor: theme.palette.background.paper,
+                zIndex: -1,
+              },
+            }));
+            const RainbowCard = styled(Card)({
+              border: '4px solid',
+              borderImage: 'linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet) 1',
+              borderRadius: '12px',
+            });
+
             return (
                 <>
                 {/* --- TOP3タスクの表示 --- */}
-                {topTasks.map((t) => (
-                    <Card style={{marginBottom: 0.5}} key={t.id}>
+                {topTasks.map((t) => {
+                    const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : Card;
+                    return (
+                    <CardWrapper style={{marginBottom: 0.5}} key={t.id}>
                         <CardContent>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                             <Typography variant="h6" component="div">
@@ -262,10 +309,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                 ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
                                 </Box>
                             )}
-                            </Typography>                
+                            </Typography>
                         </CardContent>
-                </Card>
-                ))}
+                  </CardWrapper>
+                );})}
 
                 {/* --- 4件目以降のタスクをCollapseで囲む --- */}
                 {remainingTasks.length > 0 && (
