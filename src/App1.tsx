@@ -1,10 +1,13 @@
 import React, { useContext, useEffect, useState } from "react";
+import { useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
-import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse } from './import-mui';
-import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, MenuIcon, MicIcon } from './import-mui';
+import { keyframes, styled, useTheme } from '@mui/material/styles';
+import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, Switch, Collapse } from './import-mui';
+import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, MicIcon } from './import-mui';
+import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
 
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
@@ -29,6 +32,8 @@ const fixTaskArray = (arr: any[]): Task[] =>
 
 
 const App: React.FC = () => {
+  const navigate = useNavigate();
+
   const { user, authChecked } = useContext(UserContext);
   const [openMicModal, setOpenMicModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -43,6 +48,11 @@ const App: React.FC = () => {
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
 
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const themeContext = useContext(ThemeContext);
+  if (!themeContext) return null;
+  const { mode, setMode } = themeContext;
+  const theme = useTheme();
 
   useEffect(() => {
     if (user) {
@@ -197,13 +207,38 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
   setLoading(false);
 };
 
-  if (!authChecked) return <div>認証確認中...</div>;
+  const handleToggleDark = () => {
+    setMode((mode === 'light' ? 'dark' : 'light'));
+  };
+
+  if (!authChecked) return (
+      <Box
+        sx={{
+          height: '100vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ color: '#000000a0' }}>
+          Just a mmoment...
+        </Typography>
+      </Box>
+    );
   if (!user) return <LoginButton />;
 
   return (
-    <div style={{ maxWidth: 480, margin: "2em auto", fontFamily: "sans-serif" }}>
+    <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%'
+      }}
+    >
+        <Box sx={{ width: '96%', display: 'grid', gap: 1 }}>
+
       {/* --- 入力フォーム --- */}
-      <div style={{ marginBottom: 16, display: 'flex' }}>
+      <div style={{ marginTop:16, marginBottom: 16, display: 'flex' }}>
         <TextField
           value={inputTask}
           onChange={e => setInputTask(e.target.value)}
@@ -215,9 +250,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         <Button onClick={handleAddTaskManual} disabled={!inputTask.trim()} variant="contained" sx={{ ml: 1 }}>追加</Button>
       </div>
 
-
-        <div>
-        <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
             {(() => {
             // 事前にソート済みのタスク配列を準備
             const sortedTasks = tasks
@@ -233,11 +265,57 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             const topTasks = sortedTasks.slice(0, 3);
             const remainingTasks = sortedTasks.slice(3);
 
+            const rainbowSpin = keyframes`
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            `;
+            const AnimatedCard = styled(Card)(({ theme }) => ({
+              position: 'relative',
+              zIndex: 0,
+              borderRadius: theme.shape.borderRadius,
+              padding: theme.spacing(2),
+              overflow: 'hidden',
+              // 枠の背景を回転させる擬似要素
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: '-819px',
+                left: '-819px',
+                right: '-819px',
+                bottom: '-819px',
+                borderRadius: 'inherit',
+                padding: '4px',
+                background: 'conic-gradient(red, orange, indigo, violet, red)',
+                // background: 'conic-gradient(red, orange, yellow, green, blue, indigo, violet, red)',
+                animation: `${rainbowSpin} 12s linear infinite`,
+                zIndex: -1,
+              },
+              // 枠の内側に白背景を重ねて中身を静止させる
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: 4,
+                left: 4,
+                right: 4,
+                bottom: 4,
+                borderRadius: 'inherit',
+                backgroundColor: theme.palette.background.paper,
+                zIndex: -1,
+              },
+            }));
+            const RainbowCard = styled(Card)({
+              border: '4px solid',
+              borderImage: 'linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet) 1',
+              borderRadius: '12px',
+            });
+
             return (
                 <>
                 {/* --- TOP3タスクの表示 --- */}
-                {topTasks.map((t) => (
-                    <Card style={{marginBottom: 0.5}} key={t.id}>
+                {topTasks.map((t) => {
+                    const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : Card;
+                    return (
+                    <CardWrapper style={{marginBottom: 0.5}} key={t.id}>
                         <CardContent>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                             <Typography variant="h6" component="div">
@@ -262,10 +340,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                 ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
                                 </Box>
                             )}
-                            </Typography>                
+                            </Typography>
                         </CardContent>
-                </Card>
-                ))}
+                  </CardWrapper>
+                );})}
 
                 {/* --- 4件目以降のタスクをCollapseで囲む --- */}
                 {remainingTasks.length > 0 && (
@@ -318,15 +396,21 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                 </>
             );
             })()}
+
+          <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
+            {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
+          </Button>
         </Box>
-        </div>
-      <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
-        {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
-      </Button>
 
       {/* --- 右下固定ボタン --- */}
-      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}>
-        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#f0f0f0' }}}>
+      <Box sx={{ position: 'fixed', bottom: 20, left: 20, zIndex: 1000 }}>
+        <Switch checked={mode === 'dark'} onChange={handleToggleDark} />
+      </Box>
+      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
+        <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <SettingsIcon />
+        </IconButton>
+        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
           <MicIcon fontSize="large" />
         </IconButton>
       </Box>
@@ -373,7 +457,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             </Button>
         </DialogActions>      
         </Dialog>
-    </div>
+      </Box>
   );
 };
 
