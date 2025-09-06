@@ -198,13 +198,34 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
   setLoading(false);
 };
 
-  if (!authChecked) return <div>認証確認中...</div>;
+  if (!authChecked) return (
+      <Box
+        sx={{
+          height: '100vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ color: '#000000a0' }}>
+          Just a mmoment...
+        </Typography>
+      </Box>
+    );
   if (!user) return <LoginButton />;
 
   return (
-    <div style={{ maxWidth: 480, margin: "2em auto", fontFamily: "sans-serif" }}>
+    <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%'
+      }}
+    >
+        <Box sx={{ width: '96%', display: 'grid', gap: 1 }}>
+
       {/* --- 入力フォーム --- */}
-      <div style={{ marginBottom: 16, display: 'flex' }}>
+      <div style={{ marginTop:16, marginBottom: 16, display: 'flex' }}>
         <TextField
           value={inputTask}
           onChange={e => setInputTask(e.target.value)}
@@ -216,9 +237,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         <Button onClick={handleAddTaskManual} disabled={!inputTask.trim()} variant="contained" sx={{ ml: 1 }}>追加</Button>
       </div>
 
-
-        <div>
-        <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
             {(() => {
             // 事前にソート済みのタスク配列を準備
             const sortedTasks = tasks
@@ -365,11 +383,11 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                 </>
             );
             })()}
+
+          <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
+            {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
+          </Button>
         </Box>
-        </div>
-      <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
-        {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
-      </Button>
 
       {/* --- 右下固定ボタン --- */}
       <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}>
@@ -420,7 +438,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             </Button>
         </DialogActions>      
         </Dialog>
-    </div>
+      </Box>
   );
 };
 
