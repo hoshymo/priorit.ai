@@ -3,9 +3,10 @@ import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognitio
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
-import { keyframes, styled } from '@mui/material/styles';
-import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse } from './import-mui';
+import { keyframes, styled, ThemeProvider, createTheme } from '@mui/material/styles';
+import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, Switch, Collapse } from './import-mui';
 import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, MenuIcon, MicIcon } from './import-mui';
+import { CssBaseline, useMediaQuery } from './import-mui';
 import { getAuth } from "firebase/auth";
 
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
@@ -44,6 +45,24 @@ const App: React.FC = () => {
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
 
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // light/dark mode
+  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+  const [mode, setMode] = React.useState<'light' | 'dark'>(
+    prefersDarkMode ? 'dark' : 'light'
+  );
+  const theme = React.useMemo(
+    () =>
+      createTheme({
+        palette: {
+          mode,
+          // background: {
+          //   default: mode === 'light' ? '#f5f5f5' : '#121212',
+          // },
+        },
+      }),
+    [mode]
+  );
 
   useEffect(() => {
     if (user) {
@@ -198,6 +217,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
   setLoading(false);
 };
 
+  const handleToggleDark = () => {
+    setMode((prev) => (prev === 'light' ? 'dark' : 'light'));
+  };
+
   if (!authChecked) return (
       <Box
         sx={{
@@ -215,6 +238,9 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
   if (!user) return <LoginButton />;
 
   return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+
     <Box sx={{
         display: 'flex',
         justifyContent: 'center',
@@ -390,8 +416,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         </Box>
 
       {/* --- 右下固定ボタン --- */}
-      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}>
-        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#f0f0f0' }}}>
+      <Box sx={{ position: 'fixed', bottom: 20, left: 20, zIndex: 1000 }}>
+        <Switch checked={mode === 'dark'} onChange={handleToggleDark} />
+      </Box>
+      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
+        <IconButton onClick={handleOpenMicModal} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <MenuIcon/>
+        </IconButton>
+        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
           <MicIcon fontSize="large" />
         </IconButton>
       </Box>
@@ -439,6 +471,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         </DialogActions>      
         </Dialog>
       </Box>
+    </ThemeProvider>
   );
 };
 
