@@ -18,10 +18,15 @@ export { default as Slider } from '@mui/material/Slider';
 export { default as ToggleButtonGroup } from '@mui/material/ToggleButtonGroup';
 export { default as ToggleButton } from '@mui/material/ToggleButton';
 export { default as Collapse } from '@mui/material/Collapse';
+export { default as Paper } from '@mui/material/Paper';
+export { default as CircularProgress } from '@mui/material/CircularProgress';
+export { default as Tooltip } from '@mui/material/Tooltip';
 export { default as CheckIcon } from '@mui/icons-material/CheckCircle';
 export { default as DeleteIcon } from '@mui/icons-material/Delete';
 export { default as EditIcon } from '@mui/icons-material/Edit';
 export { default as MenuIcon } from '@mui/icons-material/Menu';
 export { default as MicIcon } from '@mui/icons-material/Mic';
 export { default as PlusIcon } from '@mui/icons-material/PlusOneRounded';
+export { default as SendIcon } from '@mui/icons-material/Send';
+export { default as InfoIcon } from '@mui/icons-material/Info';
 // #endregion
