@@ -2,9 +2,11 @@
 // これにより tree-shaking もよく効くようにはなる
 
 // #region import icons
+export { default as Avatar } from '@mui/material/Avatar';
 export { default as Box } from '@mui/material/Box';
 export { default as Card } from '@mui/material/Card';
 export { default as CardContent } from '@mui/material/CardContent';
+export { default as CardHeader } from '@mui/material/CardHeader';
 export { default as IconButton } from '@mui/material/IconButton';
 export { default as Typography } from '@mui/material/Typography';
 export { default as Dialog } from '@mui/material/Dialog';

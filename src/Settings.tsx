@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
-import { Box, Button, Divider, IconButton, Stack, TextField, Typography } from './import-mui';
+import { Avatar, Box, Button, Card, CardHeader, CardContent, Divider, IconButton, Stack, TextField, Typography } from './import-mui';
 import { ArrowBackIcon, LogoutIcon, SaveIcon } from './import-mui';
+import { UserContext } from "./Usercontext";
 
 const NotePage: React.FC = () => {
   const [note, setNote] = useState('');
   const navigate = useNavigate();
   const theme = useTheme();
+  const { user, authChecked, signOut } = useContext(UserContext);
 
   const handleSave = () => {
     // 保存処理（例: API 呼び出し）
@@ -15,8 +17,8 @@ const NotePage: React.FC = () => {
     alert('Configuration saved.');
   };
 
-  const handleLogout = () => {
-    // ログアウト処理（例: 認証トークン削除 → リダイレクト）
+  const handleLogout = async () => {
+    await signOut();
     console.log('Signed out.');
     navigate('/')
   };
@@ -65,8 +67,24 @@ const NotePage: React.FC = () => {
         <Divider />
 
         <Typography variant="body1" gutterBottom>
-          Google account から sign out し、初期画面に戻ります。
+          Sign out of your Google account and return to the start screen.
+          Your data will remain intact.
         </Typography>
+
+        {user && (
+        <Card sx={{ maxWidth: 600, mt: 0 }}>
+          <CardHeader
+            avatar={<Avatar src={user.photoURL ?? undefined}>{user.displayName?.[0]}</Avatar>}
+            title={user.displayName ?? "名前未設定"}
+            subheader={user.email}
+          />
+          {/* <CardContent>
+            <Typography variant="body2" color="text.secondary">
+              UID: {user.uid}
+            </Typography>
+          </CardContent> */}
+        </Card>
+        )}
 
         <Stack spacing={1}>
           <Button
