@@ -62,6 +62,28 @@ const App: React.FC = () => {
     } else {
       setTasks([]);
     }
+
+    // SpeechRecognition の event handler 例
+    // const recognition = SpeechRecognition.getRecognition();
+    // console.log("recognition:");
+    // console.log(recognition);
+    // if (recognition) {
+    //   recognition.onstart = () => {
+    //     console.log('Speech recognition started');
+    //   };
+    //   recognition.onaudiostart = () => {
+    //     console.log('Speech recognition: audio started.');
+    //   };
+    //   recognition.onaudioend = () => {
+    //     console.log('Speech recognition: audio ended.');
+    //   };
+    //   recognition.onerror = (event) => {
+    //     console.error('SpeechRecognition error:', event.error);
+    //     console.log('Error details:', event);
+    //   };
+    // } else {
+    //   console.warn('SpeechRecognition is not supported in this browser.');
+    // }
   }, [user]);
 
   // --- タスク追加時のaiPriorityをデフォルト値(50)に設定 ---
@@ -147,9 +169,9 @@ const App: React.FC = () => {
   };
   
   const handleOpenMicModal = () => {
-    setOpenMicModal(true);
     resetTranscript();
     SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
+    setOpenMicModal(true);
   };
 
   // --- LLMの優先度付け機能を修正 ---
@@ -400,6 +422,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
             {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
           </Button>
+
+          {/* TODO */}
+          <Typography variant="body1" sx={{ mt: 2, minHeight: 28 }}>{transcript}</Typography>
+
         </Box>
 
       {/* --- 右下固定ボタン --- */}
@@ -418,6 +444,15 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
       {/* --- 音声入力モーダル --- */}
       <Dialog open={openMicModal} onClose={handleCloseMicModal} fullWidth>
         <DialogTitle>音声入力でタスク追加</DialogTitle>
+        {!browserSupportsSpeechRecognition ? (
+          <>
+          <Typography color="error" sx={{ margin: 2 }}>動作環境が音声認識に対応していません。別のブラウザ等を使用してください。</Typography>
+          <DialogActions>
+            <Button onClick={handleCloseMicModal}>キャンセル</Button>
+          </DialogActions>
+          </>
+        ) : (
+          <>
         <DialogContent>
           <Typography variant="subtitle1" sx={{ mt: 2 }}>{listening ? "録音中..." : "マイクに向かって話してください"}</Typography>
           <Typography variant="body1" sx={{ mt: 2, minHeight: 28 }}>{transcript}</Typography>
@@ -426,8 +461,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           <Button onClick={handleCloseMicModal}>キャンセル</Button>
           <Button onClick={handleAddTaskFromModal} disabled={!transcript.trim()} color="primary" variant="contained" startIcon={<CheckIcon />}>タスク追加</Button>
         </DialogActions>
+          </>
+        )}
       </Dialog>
-      
+
       {/* --- 編集モーダル --- */}
       <Dialog open={openEditModal} onClose={handleCloseEditModal} fullWidth>
         <DialogTitle>タスクの編集</DialogTitle>
