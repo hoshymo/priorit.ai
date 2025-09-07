@@ -1,7 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
-import { Avatar, Box, Button, Card, CardHeader, CardContent, Divider, IconButton, Stack, TextField, Typography } from './import-mui';
+import { Avatar, Box, Button, Card, CardHeader, CardContent, Divider, IconButton, Stack, TextField, Typography } from '@mui/material';
 import { ArrowBackIcon, LogoutIcon, SaveIcon } from './import-mui';
 import { UserContext } from "./Usercontext";
 

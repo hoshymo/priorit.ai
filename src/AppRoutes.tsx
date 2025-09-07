@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { CssBaseline, useMediaQuery } from './import-mui';
+import { CssBaseline, useMediaQuery } from '@mui/material';
 import { ThemeContext } from './ThemeContext';
 import MainPage from './App1';
 import SettingsPage from './Settings';

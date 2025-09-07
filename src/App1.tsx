@@ -4,8 +4,9 @@ import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognitio
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
+import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
-import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Switch, Collapse, Paper, Tooltip } from './import-mui';
+import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
 import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, MicIcon, InfoIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
@@ -55,6 +56,9 @@ const App: React.FC = () => {
   if (!themeContext) return null;
   const { mode, setMode } = themeContext;
   const theme = useTheme();
+
+  const [focusArea, setFocusArea] = useState<'list' | 'chat'>('list');
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // 600px以下
 
   useEffect(() => {
     if (user) {
@@ -259,17 +263,19 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         }}
       >
         <Typography variant="subtitle2" sx={{ color: '#000000a0' }}>
-          Just a mmoment...
+          Just a moment...
         </Typography>
       </Box>
     );
   if (!user) return <LoginButton />;
 
-  return (
+  const TodoList = () => {
+    return (
     <Box sx={{
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
+        height: '100%',
         width: '100%'
       }}
     >
@@ -551,7 +557,140 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         </DialogActions>      
         </Dialog>
       </Box>
+  )};
+
+  const ChatPanel = () => {
+    return (
+    <Box
+      flexDirection="column"
+      sx={{
+        display: 'flex',
+        margin: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+        // width: '100vw'
+      }}
+    >
+      <Typography variant="h6" sx={{ mt: 2, mb: 2 }}>
+        Chat Panel
+      </Typography>
+
+      <Divider />
+
+      <TextField
+        value={inputTask}
+        onChange={e => setInputTask(e.target.value)}
+        placeholder="タスクを手入力"
+        variant="outlined"
+        size="small"
+        fullWidth
+      />
+
+      <Divider />
+
+      <Button onClick={(e) => {
+          e.stopPropagation(); // click することでこの panel に focus が来てしまうのを防ぐ
+          setFocusArea('list');
+        }
+      } variant="contained" sx={{ mt: 2 }}>Test</Button>
+    </Box>
+  )};
+
+
+  return (
+    // 縦並べ layout 試行錯誤
+    // <Box
+    //   display="flex" 
+    //   flexDirection={isMobile ? 'column' : 'row'}
+    //   height="100vh"
+    //   width="100vw"
+    // >
+    //   {/* List Area */}
+    //   <Paper
+    //     elevation={3}
+    //     tabIndex={0}
+    //     onClick={() => setFocusArea('list')}
+    //     onFocus={() => setFocusArea('list')}
+    //     sx={{
+    //       flexGrow: focusArea === 'list' ? 8 : 2,
+    //       transition: 'flex-grow 0.3s ease',
+    //       overflow: 'auto',
+    //     }}
+    //   >
+    //     {/* List content here */}
+    //     <TodoList />
+    //   </Paper>
+
+    //   {/* Chat Area */}
+    //   <Paper
+    //     elevation={3}
+    //     tabIndex={0}
+    //     onClick={() => setFocusArea('chat')}
+    //     onFocus={() => setFocusArea('chat')}
+    //     sx={{
+    //       flexGrow: focusArea === 'chat' ? 8 : 2,
+    //       transition: 'flex-grow 0.3s ease',
+    //       overflow: 'auto',
+    //     }}
+    //   >
+    //     {/* Chat content here */}
+    //     <ChatPanel />
+    //   </Paper>
+    // </Box>
+    <Box
+      position="relative"
+      width="100%"
+      height="100vh"
+      overflow="hidden"
+    >
+      {/* List Window */}
+      <Paper
+        tabIndex={0}
+        onClick={() => setFocusArea('list')}
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: isMobile ? '100%' : '50%',
+          height: '100%',
+          transform: isMobile
+            ? focusArea === 'list'
+              ? 'translateX(0%)'
+              : 'translateX(-10%)'
+            : 'none',
+          transition: 'transform 0.3s ease',
+          // zIndex: focusArea === 'list' ? 1 : 2,
+        }}
+      >
+        {/* List content */}
+        <TodoList />
+      </Paper>
+
+      {/* Chat Window */}
+      <Paper
+        tabIndex={0}
+        onClick={() => setFocusArea('chat')}
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: isMobile ? '90%' : '50%',
+          height: '100%',
+          transform: isMobile
+            ? focusArea === 'chat'
+              ? 'translateX(10%)'
+              : 'translateX(100%)'
+            : 'translateX(100%)',
+          transition: 'transform 0.3s ease',
+          // zIndex: focusArea === 'chat' ? 2 : 1,
+        }}
+      >
+        {/* Chat content */}
+        <ChatPanel />
+      </Paper>
+    </Box>
   );
+
 };
 
 export default App;

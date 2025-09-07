@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { useTheme } from '@mui/material/styles';
-import { Box, Paper, Typography, TextField, Button, IconButton, CircularProgress } from '../import-mui';
+import { Box, Paper, Typography, TextField, Button, IconButton, CircularProgress } from '@mui/material';
 import { MicIcon, SendIcon } from '../import-mui';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { UserContext } from '../Usercontext';
