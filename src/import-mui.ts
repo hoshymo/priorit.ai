@@ -23,6 +23,9 @@ export { default as ToggleButtonGroup } from '@mui/material/ToggleButtonGroup';
 export { default as ToggleButton } from '@mui/material/ToggleButton';
 export { default as Collapse } from '@mui/material/Collapse';
 export { default as ArrowBackIcon } from '@mui/icons-material/ArrowBack';
+export { default as Paper } from '@mui/material/Paper';
+export { default as CircularProgress } from '@mui/material/CircularProgress';
+export { default as Tooltip } from '@mui/material/Tooltip';
 export { default as CheckIcon } from '@mui/icons-material/CheckCircle';
 export { default as DeleteIcon } from '@mui/icons-material/Delete';
 export { default as LogoutIcon } from '@mui/icons-material/Logout';
@@ -34,4 +37,6 @@ export { default as SaveIcon } from '@mui/icons-material/Save';
 export { default as GoogleIcon } from '@mui/icons-material/Google';
 export { default as CssBaseline } from '@mui/material/CssBaseline';
 export { default as useMediaQuery } from '@mui/material/useMediaQuery';
+export { default as SendIcon } from '@mui/icons-material/Send';
+export { default as InfoIcon } from '@mui/icons-material/Info';
 // #endregion
