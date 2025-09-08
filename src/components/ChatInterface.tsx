@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
+import { useTheme } from '@mui/material/styles';
 import { Box, Paper, Typography, TextField, Button, IconButton, CircularProgress } from '../import-mui';
 import { MicIcon, SendIcon } from '../import-mui';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
@@ -21,6 +22,7 @@ const ChatInterface: React.FC<{
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
+  const theme = useTheme();
   
   // 音声認識の結果を入力欄に反映
   useEffect(() => {
@@ -154,7 +156,7 @@ const ChatInterface: React.FC<{
       {/* メッセージ表示エリア */}
       <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
         {messages.length === 0 && (
-          <Typography sx={{ textAlign: 'center', color: 'text.secondary', my: 4 }}>
+          <Typography sx={{ textAlign: 'center', color: theme.palette.text.secondary, my: 4 }}>
             タスクについて話しかけてください。例：「明日までに報告書を提出する」
           </Typography>
         )}
@@ -165,8 +167,8 @@ const ChatInterface: React.FC<{
               sx={{ 
                 p: 2, 
                 maxWidth: '80%',
-                bgcolor: msg.sender === 'user' ? 'primary.light' : 'grey.100',
-                color: msg.sender === 'user' ? 'white' : 'text.primary',
+                bgcolor: msg.sender === 'user' ? 'primary.dark' : theme.palette.action.hover,
+                color: msg.sender === 'user' ? 'white' : theme.palette.text.primary,
                 borderRadius: 2
               }}
             >
@@ -182,8 +184,8 @@ const ChatInterface: React.FC<{
                       variant="outlined"
                       onClick={() => handleOptionClick(option)}
                       sx={{ 
-                        borderColor: msg.sender === 'user' ? 'white' : 'primary.main',
-                        color: msg.sender === 'user' ? 'white' : 'primary.main'
+                        borderColor: msg.sender === 'user' ? theme.palette.divider : theme.palette.divider,
+                        color: msg.sender === 'user' ? theme.palette.text.secondary : theme.palette.text.primary
                       }}
                     >
                       {option}
