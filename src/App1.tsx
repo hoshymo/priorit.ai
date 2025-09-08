@@ -3,20 +3,16 @@ import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognitio
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
-import { Box, Card, CardContent, IconButton, Typography, CardActionArea,Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse } from './import-mui';
-import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, MenuIcon, MicIcon } from './import-mui';
+import { Box, Card, CardContent, IconButton, Typography, CardActionArea, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Collapse, Paper, Tooltip } from './import-mui';
+import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, MenuIcon, MicIcon, InfoIcon } from './import-mui';
 import { getAuth } from "firebase/auth";
+import ChatInterface from "./components/ChatInterface";
+import { Task } from "./types";
 
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
 
-// --- ステップ1: Taskの型定義を変更 ---
-type Task = {
-  id: string;
-  task: string;
-  aiPriority: number;     // ← priorityからaiPriorityに名前変更
-  userPriority?: number;  // ← 追加 (3:高, 2:中, 1:低)
-};
+// 既存のデータ変換ロジック
 
 // 既存のデータ変換ロジックも修正
 const fixTaskArray = (arr: any[]): Task[] =>
@@ -25,6 +21,11 @@ const fixTaskArray = (arr: any[]): Task[] =>
     task: t.task,
     aiPriority: t.priority || t.aiPriority || 50, // ← 互換性のための修正
     userPriority: t.userPriority, // ← userPriorityを読み込む
+    priority: t.priority || 'medium', // 優先度（high/medium/low）
+    status: t.status || 'todo', // ステータス（todo/done）
+    reason: t.reason, // 理由（あれば）
+    dueDate: t.dueDate, // 期限（あれば）
+    tags: t.tags || [] // タグ（あれば）
   }));
 
 
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -60,7 +62,9 @@ const App: React.FC = () => {
     const newTask = { 
       id: Date.now().toString(), 
       task: inputTask.trim(), 
-      aiPriority: 50 // ← aiPriorityとして追加
+      aiPriority: 50, // ← aiPriorityとして追加
+      status: 'todo' as const,
+      priority: 'medium' as const
     };
     const newTasks = [...tasks, newTask];
     setTasks(newTasks);
@@ -68,12 +72,24 @@ const App: React.FC = () => {
     setInputTask("");
   };
 
+  // チャットから作成されたタスクを追加
+  const handleTaskCreated = async (newTask: Task) => {
+    if (!user) return;
+    
+    // 既存のタスク配列に追加
+    const newTasks = [...tasks, newTask];
+    setTasks(newTasks);
+    await saveTasks(user.uid, newTasks);
+  };
+
   const handleAddTaskFromModal = async () => {
     if (!user || !transcript.trim()) return;
-    const newTask = {
+    const newTask: Task = {
       id: Date.now().toString(),
       task: transcript.trim(),
-      aiPriority: 50 // ← aiPriorityとして追加
+      aiPriority: 50, // ← aiPriorityとして追加
+      priority: 'medium', // 優先度（high/medium/low）
+      status: 'todo' // ステータス（todo/done）
     };
     const newTasks = [...tasks, newTask];
     setTasks(newTasks);
@@ -202,18 +218,42 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
 
   return (
     <div style={{ maxWidth: 480, margin: "2em auto", fontFamily: "sans-serif" }}>
-      {/* --- 入力フォーム --- */}
-      <div style={{ marginBottom: 16, display: 'flex' }}>
-        <TextField
-          value={inputTask}
-          onChange={e => setInputTask(e.target.value)}
-          placeholder="タスクを手入力"
-          variant="outlined"
-          size="small"
-          fullWidth
-        />
-        <Button onClick={handleAddTaskManual} disabled={!inputTask.trim()} variant="contained" sx={{ ml: 1 }}>追加</Button>
-      </div>
+      {/* チャットインターフェース切り替えボタン */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
+        <Button
+          variant={showChat ? "outlined" : "contained"}
+          onClick={() => setShowChat(false)}
+          sx={{ mr: 1 }}
+        >
+          タスクリスト
+        </Button>
+        <Button
+          variant={showChat ? "contained" : "outlined"}
+          onClick={() => setShowChat(true)}
+        >
+          チャットで追加
+        </Button>
+      </Box>
+      
+      {showChat ? (
+        // チャットインターフェース
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <ChatInterface onTaskCreated={handleTaskCreated} />
+        </Paper>
+      ) : (
+        // 既存のタスク入力フォーム
+        <div style={{ marginBottom: 16, display: 'flex' }}>
+          <TextField
+            value={inputTask}
+            onChange={e => setInputTask(e.target.value)}
+            placeholder="タスクを手入力"
+            variant="outlined"
+            size="small"
+            fullWidth
+          />
+          <Button onClick={handleAddTaskManual} disabled={!inputTask.trim()} variant="contained" sx={{ ml: 1 }}>追加</Button>
+        </div>
+      )}
 
 
         <div>
@@ -242,6 +282,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                             <Typography variant="h6" component="div">
                                 {t.task}
+                                {/* 理由表示用ツールチップ */}
+                                {t.reason && (
+                                  <Tooltip title={t.reason}>
+                                    <IconButton size="small">
+                                      <InfoIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                             </Typography>
                             <Box>
                                 <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
@@ -278,6 +326,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                                     <Typography variant="h6" component="div">
                                         {t.task}
+                                        {/* 理由表示用ツールチップ */}
+                                        {t.reason && (
+                                          <Tooltip title={t.reason}>
+                                            <IconButton size="small">
+                                              <InfoIcon fontSize="small" />
+                                            </IconButton>
+                                          </Tooltip>
+                                        )}
                                     </Typography>
                                     <Box>
                                         <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
@@ -324,12 +380,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
       </Button>
 
-      {/* --- 右下固定ボタン --- */}
-      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}>
-        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#f0f0f0' }}}>
-          <MicIcon fontSize="large" />
-        </IconButton>
-      </Box>
+      {/* --- 右下固定ボタン --- チャットモードでは非表示 */}
+      {!showChat && (
+        <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000 }}>
+          <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'white', '&:hover': { bgcolor: '#f0f0f0' }}}>
+            <MicIcon fontSize="large" />
+          </IconButton>
+        </Box>
+      )}
 
       {/* --- 音声入力モーダル --- */}
       <Dialog open={openMicModal} onClose={handleCloseMicModal} fullWidth>
