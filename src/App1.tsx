@@ -4,7 +4,8 @@ import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognitio
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
-import { keyframes, styled, useTheme } from '@mui/material/styles';import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Switch, Collapse, Paper, Tooltip } from './import-mui';
+import { keyframes, styled, useTheme } from '@mui/material/styles';
+import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Switch, Collapse, Paper, Tooltip } from './import-mui';
 import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, MicIcon, InfoIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
@@ -477,9 +478,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
             {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
           </Button>
-
-          {/* TODO */}
-          <Typography variant="body1" sx={{ mt: 2, minHeight: 28 }}>{transcript}</Typography>
 
         </Box>
 
