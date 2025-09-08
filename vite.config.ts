@@ -10,7 +10,7 @@ export default defineConfig({
   build: {
     outDir: 'build'
   },
-  base: '/priorit.ai/',
+//   base: '/',
   plugins: [react()],
   optimizeDeps: {
     include: ['@mui/material', '@emotion/react', '@emotion/styled']

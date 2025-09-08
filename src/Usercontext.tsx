@@ -1,20 +1,12 @@
 import React, { createContext, useEffect, useState } from "react";
-import { getAuth, onAuthStateChanged, User, signOut as fbSignOut } from "firebase/auth";
+import { auth } from "./firebase";
+import { onAuthStateChanged, User } from "firebase/auth";
 
-export const UserContext = createContext<{
-  user: User | null,
-  authChecked: boolean,
-  signOut: () => Promise<void>;
-}>({
-  user: null,
-  authChecked: false,
-  signOut: async () => {},
-});
+export const UserContext = createContext<{ user: User | null, authChecked: boolean }>({ user: null, authChecked: false });
 
 export const UserProvider: React.FC<{children: React.ReactNode}> = ({children}) => {
   const [user, setUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const auth = getAuth();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -23,20 +15,7 @@ export const UserProvider: React.FC<{children: React.ReactNode}> = ({children}) 
     });
     return () => unsub();
   }, []);
-
-  const signOut = async () => {
-    try {
-      await fbSignOut(auth);
-      setUser(null);
-    } catch (error) {
-      console.error("Sign-out error:", error);
-    }
-  };
-
-  return (
-    <UserContext.Provider value={{ user, authChecked, signOut }}>
-      {children}
-    </UserContext.Provider>
-  );
+  // return <UserContext.Provider value={user}>{children}</UserContext.Provider>;
+  return <UserContext.Provider value={{ user, authChecked }}>{children}</UserContext.Provider>;
 };
 
