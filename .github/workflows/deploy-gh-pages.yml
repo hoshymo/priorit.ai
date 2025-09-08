@@ -6,9 +6,7 @@ on:
   push:
     branches: ['develop']
     paths:
-      - 'index.html'
       - 'src/**'
-      - 'vite.config.ts'
       - 'package-lock.json'
 
   workflow_dispatch:

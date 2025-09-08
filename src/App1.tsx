@@ -1,5 +1,4 @@
 import React, { useContext, useEffect, useState } from "react";
-import { useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
@@ -33,8 +32,6 @@ const fixTaskArray = (arr: any[]): Task[] =>
 
 
 const App: React.FC = () => {
-  const navigate = useNavigate();
-
   const { user, authChecked } = useContext(UserContext);
   const [openMicModal, setOpenMicModal] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -64,28 +61,6 @@ const App: React.FC = () => {
     } else {
       setTasks([]);
     }
-
-    // SpeechRecognition の event handler 例
-    // const recognition = SpeechRecognition.getRecognition();
-    // console.log("recognition:");
-    // console.log(recognition);
-    // if (recognition) {
-    //   recognition.onstart = () => {
-    //     console.log('Speech recognition started');
-    //   };
-    //   recognition.onaudiostart = () => {
-    //     console.log('Speech recognition: audio started.');
-    //   };
-    //   recognition.onaudioend = () => {
-    //     console.log('Speech recognition: audio ended.');
-    //   };
-    //   recognition.onerror = (event) => {
-    //     console.error('SpeechRecognition error:', event.error);
-    //     console.log('Error details:', event);
-    //   };
-    // } else {
-    //   console.warn('SpeechRecognition is not supported in this browser.');
-    // }
   }, [user]);
 
   // --- タスク追加時のaiPriorityをデフォルト値(50)に設定 ---
@@ -185,9 +160,9 @@ const App: React.FC = () => {
   };
   
   const handleOpenMicModal = () => {
+    setOpenMicModal(true);
     resetTranscript();
     SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
-    setOpenMicModal(true);
   };
 
   // --- LLMの優先度付け機能を修正 ---
@@ -245,24 +220,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
   setLoading(false);
 };
 
-  const handleToggleDark = () => {
-    setMode((mode === 'light' ? 'dark' : 'light'));
-  };
-
-  if (!authChecked) return (
-      <Box
-        sx={{
-          height: '100vh',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <Typography variant="subtitle2" sx={{ color: '#000000a0' }}>
-          Just a mmoment...
-        </Typography>
-      </Box>
-    );
+  if (!authChecked) return <div>認証確認中...</div>;
   if (!user) return <LoginButton />;
 
   return (
@@ -327,57 +285,11 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             const topTasks = sortedTasks.slice(0, 3);
             const remainingTasks = sortedTasks.slice(3);
 
-            const rainbowSpin = keyframes`
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            `;
-            const AnimatedCard = styled(Card)(({ theme }) => ({
-              position: 'relative',
-              zIndex: 0,
-              borderRadius: theme.shape.borderRadius,
-              padding: theme.spacing(2),
-              overflow: 'hidden',
-              // 枠の背景を回転させる擬似要素
-              '&::before': {
-                content: '""',
-                position: 'absolute',
-                top: '-819px',
-                left: '-819px',
-                right: '-819px',
-                bottom: '-819px',
-                borderRadius: 'inherit',
-                padding: '4px',
-                background: 'conic-gradient(red, orange, indigo, violet, red)',
-                // background: 'conic-gradient(red, orange, yellow, green, blue, indigo, violet, red)',
-                animation: `${rainbowSpin} 12s linear infinite`,
-                zIndex: -1,
-              },
-              // 枠の内側に白背景を重ねて中身を静止させる
-              '&::after': {
-                content: '""',
-                position: 'absolute',
-                top: 4,
-                left: 4,
-                right: 4,
-                bottom: 4,
-                borderRadius: 'inherit',
-                backgroundColor: theme.palette.background.paper,
-                zIndex: -1,
-              },
-            }));
-            const RainbowCard = styled(Card)({
-              border: '4px solid',
-              borderImage: 'linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet) 1',
-              borderRadius: '12px',
-            });
-
             return (
                 <>
                 {/* --- TOP3タスクの表示 --- */}
-                {topTasks.map((t) => {
-                    const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : Card;
-                    return (
-                    <CardWrapper style={{marginBottom: 0.5}} key={t.id}>
+                {topTasks.map((t) => (
+                    <Card style={{marginBottom: 0.5}} key={t.id}>
                         <CardContent>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                             <Typography variant="h6" component="div">
@@ -410,10 +322,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                 ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
                                 </Box>
                             )}
-                            </Typography>
+                            </Typography>                
                         </CardContent>
-                  </CardWrapper>
-                );})}
+                </Card>
+                ))}
 
                 {/* --- 4件目以降のタスクをCollapseで囲む --- */}
                 {remainingTasks.length > 0 && (
@@ -500,15 +412,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
       {/* --- 音声入力モーダル --- */}
       <Dialog open={openMicModal} onClose={handleCloseMicModal} fullWidth>
         <DialogTitle>音声入力でタスク追加</DialogTitle>
-        {!browserSupportsSpeechRecognition ? (
-          <>
-          <Typography color="error" sx={{ margin: 2 }}>動作環境が音声認識に対応していません。別のブラウザ等を使用してください。</Typography>
-          <DialogActions>
-            <Button onClick={handleCloseMicModal}>キャンセル</Button>
-          </DialogActions>
-          </>
-        ) : (
-          <>
         <DialogContent>
           <Typography variant="subtitle1" sx={{ mt: 2 }}>{listening ? "録音中..." : "マイクに向かって話してください"}</Typography>
           <Typography variant="body1" sx={{ mt: 2, minHeight: 28 }}>{transcript}</Typography>
@@ -517,10 +420,8 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           <Button onClick={handleCloseMicModal}>キャンセル</Button>
           <Button onClick={handleAddTaskFromModal} disabled={!transcript.trim()} color="primary" variant="contained" startIcon={<CheckIcon />}>タスク追加</Button>
         </DialogActions>
-          </>
-        )}
       </Dialog>
-
+      
       {/* --- 編集モーダル --- */}
       <Dialog open={openEditModal} onClose={handleCloseEditModal} fullWidth>
         <DialogTitle>タスクの編集</DialogTitle>
@@ -550,7 +451,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             </Button>
         </DialogActions>      
         </Dialog>
-      </Box>
+    </div>
   );
 };
 
