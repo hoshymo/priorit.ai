@@ -1,9 +1,10 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
-import { Avatar, Box, Button, Card, CardHeader, CardContent, Divider, IconButton, Stack, TextField, Typography } from '@mui/material';
+import { Avatar, Box, Button, Card, CardHeader, CardContent, CircularProgress, Divider, IconButton, Stack, TextField, Typography } from '@mui/material';
 import { ArrowBackIcon, LogoutIcon, SaveIcon } from './import-mui';
 import { UserContext } from "./Usercontext";
+import { loadSystemPrompt, saveSystemPrompt } from './Promptsetting';
 
 const NotePage: React.FC = () => {
   const [note, setNote] = useState('');
@@ -11,11 +12,45 @@ const NotePage: React.FC = () => {
   const theme = useTheme();
   const { user, authChecked, signOut } = useContext(UserContext);
 
-  const handleSave = () => {
-    // 保存処理（例: API 呼び出し）
-    // console.log('保存された内容:', note);
-    alert('Configuration saved.');
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
+
+  // コンポーネント読み込み時に現在のプロンプトをDBから取得
+  useEffect(() => {
+    if (user) {
+      setLoading(true);
+      loadSystemPrompt(user.uid)
+        .then(setPrompt)
+        .finally(() => setLoading(false));
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+    setSaving(true);
+    setSaveStatus(null);
+    try {
+      await saveSystemPrompt(user.uid, prompt);
+      setSaveStatus('success');
+    } catch (error) {
+      setSaveStatus('error');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return <CircularProgress />;
+  }
+
+
+  // const handleSave = () => {
+  //   // 保存処理（例: API 呼び出し）
+  //   // console.log('保存された内容:', note);
+  //   alert('Configuration saved.');
+  // };
 
   const handleLogout = async () => {
     await signOut();
@@ -34,6 +69,37 @@ const NotePage: React.FC = () => {
         </Typography>
       </Stack>
 
+      <Typography variant="h5" gutterBottom>
+        AIのペルソナ設定
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        AIにどのような役割を担ってほしいか、自由に指示を書いてください。
+      </Typography>
+      <TextField
+        label="システムプロンプト"
+        multiline
+        rows={8}
+        fullWidth
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        variant="outlined"
+      />
+      <Button
+        variant="contained"
+        onClick={handleSave}
+        disabled={saving}
+        sx={{ mt: 2 }}
+      >
+        {saving ? <CircularProgress size={24} /> : '保存する'}
+      </Button>
+
+      {/* {saveStatus === 'success' && (
+        <Alert severity="success" sx={{ mt: 2 }}>保存しました。</Alert>
+      )}
+      {saveStatus === 'error' && (
+        <Alert severity="error" sx={{ mt: 2 }}>保存に失敗しました。</Alert>
+      )}
+ */}
       <Stack spacing={3}>
 
         <Divider />

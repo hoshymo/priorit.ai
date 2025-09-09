@@ -40,7 +40,110 @@ const ChatInterface: React.FC<{
   }, [messages]);
   
   // メッセージ送信処理
-  const handleSend = async () => {
+  // const handleSend = async () => {
+  //   if (!user || !input.trim()) return;
+    
+  //   // ユーザーメッセージを追加
+  //   const userMsg: ChatMessage = {
+  //     id: Date.now().toString(),
+  //     sender: 'user',
+  //     content: input,
+  //     timestamp: new Date()
+  //   };
+    
+  //   setMessages(prev => [...prev, userMsg]);
+  //   setInput('');
+  //   resetTranscript();
+  //   setLoading(true);
+    
+  //   try {
+  //     // 会話コンテキスト構築（最新の5メッセージ）
+  //     const recentMessages = messages.slice(-5).map(m => 
+  //       `${m.sender === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`
+  //     ).join('\n');
+      
+  //     // APIリクエスト
+  //     const idtoken = await getAuth()?.currentUser?.getIdToken();
+  //     const response = await fetch(`${BE_DOMAIN}/api/chat`, {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         'Authorization': `Bearer ${idtoken}`
+  //       },
+  //       body: JSON.stringify({
+  //         message: input,
+  //         context: recentMessages
+  //       })
+  //     });
+      
+  //     if (!response.ok) {
+  //       throw new Error('APIリクエストに失敗しました');
+  //     }
+      
+  //     const data = await response.json();
+      
+  //     // AIメッセージを追加
+  //     const aiMsg: ChatMessage = {
+  //       id: Date.now().toString(),
+  //       sender: 'ai',
+  //       content: data.message,
+  //       timestamp: new Date(),
+  //       suggestedTask: data.extractedTask,
+  //       options: data.options
+  //     };
+      
+  //     setMessages(prev => [...prev, aiMsg]);
+      
+  //     // タスク情報を更新
+  //     setCurrentTask(prev => ({
+  //       ...prev,
+  //       ...data.extractedTask
+  //     }));
+      
+  //     // タスク情報が完成したら保存
+  //     if (data.complete) {
+  //       const finalTask: Task = {
+  //         id: Date.now().toString(),
+  //         task: data.extractedTask.title,
+  //         aiPriority: data.extractedTask.priority === 'high' ? 80 : 
+  //                    data.extractedTask.priority === 'medium' ? 50 : 20,
+  //         dueDate: data.extractedTask.dueDate,
+  //         priority: data.extractedTask.priority,
+  //         status: 'todo',
+  //         reason: data.extractedTask.reason,
+  //         tags: data.extractedTask.tags
+  //       };
+        
+  //       // 既存のタスク配列に追加して保存
+  //       onTaskCreated(finalTask);
+        
+  //       // 確認メッセージ
+  //       setMessages(prev => [...prev, {
+  //         id: Date.now().toString(),
+  //         sender: 'ai',
+  //         content: `タスク「${finalTask.task}」を追加しました！`,
+  //         timestamp: new Date()
+  //       }]);
+        
+  //       // 現在のタスク情報をリセット
+  //       setCurrentTask({});
+  //     }
+  //   } catch (error) {
+  //     console.error('エラー:', error);
+  //     // エラーメッセージ
+  //     setMessages(prev => [...prev, {
+  //       id: Date.now().toString(),
+  //       sender: 'ai',
+  //       content: 'すみません、エラーが発生しました。もう一度お試しください。',
+  //       timestamp: new Date()
+  //     }]);
+  //   }
+    
+  //   setLoading(false);
+  // };
+
+    const handleSend = async () => {
+    // 冒頭のこのチェックでuserの存在を確認しているので、このuserオブジェクトを使いましょう。
     if (!user || !input.trim()) return;
     
     // ユーザーメッセージを追加
@@ -62,8 +165,15 @@ const ChatInterface: React.FC<{
         `${m.sender === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`
       ).join('\n');
       
+      // --- ▼▼▼ 修正点 ▼▼▼ ---
+      // getAuth().currentUser の代わりに、コンポーネントが保持している `user` オブジェクトから直接トークンを取得します。
+      const idtoken = await user.getIdToken();
+
+      // (デバッグ用) トークンが取得できているかコンソールで確認
+      // console.log("ID Token:", idtoken); 
+      // --- ▲▲▲ 修正ここまで ▲▲▲ ---
+
       // APIリクエスト
-      const idtoken = await getAuth()?.currentUser?.getIdToken();
       const response = await fetch(`${BE_DOMAIN}/api/chat`, {
         method: 'POST',
         headers: {
@@ -77,7 +187,10 @@ const ChatInterface: React.FC<{
       });
       
       if (!response.ok) {
-        throw new Error('APIリクエストに失敗しました');
+        // サーバーからの具体的なエラーメッセージをログに出力すると、デバッグがしやすくなります。
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(errorData.error || 'APIリクエストに失敗しました');
       }
       
       const data = await response.json();
@@ -114,10 +227,8 @@ const ChatInterface: React.FC<{
           tags: data.extractedTask.tags
         };
         
-        // 既存のタスク配列に追加して保存
         onTaskCreated(finalTask);
         
-        // 確認メッセージ
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
           sender: 'ai',
@@ -125,12 +236,10 @@ const ChatInterface: React.FC<{
           timestamp: new Date()
         }]);
         
-        // 現在のタスク情報をリセット
         setCurrentTask({});
       }
     } catch (error) {
       console.error('エラー:', error);
-      // エラーメッセージ
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         sender: 'ai',
@@ -141,6 +250,7 @@ const ChatInterface: React.FC<{
     
     setLoading(false);
   };
+
   
   // 選択肢クリック処理
   const handleOptionClick = (option: string) => {

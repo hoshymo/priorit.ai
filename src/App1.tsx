@@ -69,6 +69,9 @@ const App: React.FC = () => {
       setTasks([]);
     }
 
+    if(user){
+      console.log(user.uid);
+    }
     // SpeechRecognition の event handler 例
     // const recognition = SpeechRecognition.getRecognition();
     // console.log("recognition:");
