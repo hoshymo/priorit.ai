@@ -33,7 +33,10 @@ const ChatInterface: React.FC<{
   
   // メッセージが追加されたら自動スクロール
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // 初期表示時にこれが有効になると表示がおかしくなるので messages が増えたときだけ行う
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
   
   // 音声入力開始
@@ -152,7 +155,7 @@ const ChatInterface: React.FC<{
   };
   
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '70vh' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh' }}>
       {/* メッセージ表示エリア */}
       <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
         {messages.length === 0 && (

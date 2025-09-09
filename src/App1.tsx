@@ -6,7 +6,7 @@ import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
 import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
-import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
+import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Slide, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
 import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, MicIcon, InfoIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
@@ -188,10 +188,12 @@ const App: React.FC = () => {
     resetTranscript();
   };
   
-  const handleOpenMicModal = () => {
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
-    setOpenMicModal(true);
+  const handleOpenMicModal = (e: { stopPropagation: () => void; }) => {
+    // resetTranscript();
+    // SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
+    // setOpenMicModal(true);
+    e.stopPropagation(); // click することでこの panel に focus が来てしまうのを防ぐ
+    setFocusArea(focusArea == 'list' ? 'chat' : 'list');
   };
 
   // --- LLMの優先度付け機能を修正 ---
@@ -280,43 +282,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
       }}
     >
         <Box sx={{ width: '96%', display: 'grid', gap:1, mt: 2 }}>
-
-      {/* チャットインターフェース切り替えボタン */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-        <Button
-          variant={showChat ? "outlined" : "contained"}
-          onClick={() => setShowChat(false)}
-          sx={{ mr: 1 }}
-        >
-          タスクリスト
-        </Button>
-        <Button
-          variant={showChat ? "contained" : "outlined"}
-          onClick={() => setShowChat(true)}
-        >
-          チャットで追加
-        </Button>
-      </Box>
-      
-      {showChat ? (
-        // チャットインターフェース
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <ChatInterface onTaskCreated={handleTaskCreated} />
-        </Paper>
-      ) : (
-        // 既存のタスク入力フォーム
-        <div style={{ marginBottom: 16, display: 'flex' }}>
-          <TextField
-            value={inputTask}
-            onChange={e => setInputTask(e.target.value)}
-            placeholder="タスクを手入力"
-            variant="outlined"
-            size="small"
-            fullWidth
-          />
-          <Button onClick={handleAddTaskManual} disabled={!inputTask.trim()} variant="contained" sx={{ ml: 1 }}>追加</Button>
-        </div>
-      )}
 
             {(() => {
             // 事前にソート済みのタスク配列を準備
@@ -598,45 +563,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
 
 
   return (
-    // 縦並べ layout 試行錯誤
-    // <Box
-    //   display="flex" 
-    //   flexDirection={isMobile ? 'column' : 'row'}
-    //   height="100vh"
-    //   width="100vw"
-    // >
-    //   {/* List Area */}
-    //   <Paper
-    //     elevation={3}
-    //     tabIndex={0}
-    //     onClick={() => setFocusArea('list')}
-    //     onFocus={() => setFocusArea('list')}
-    //     sx={{
-    //       flexGrow: focusArea === 'list' ? 8 : 2,
-    //       transition: 'flex-grow 0.3s ease',
-    //       overflow: 'auto',
-    //     }}
-    //   >
-    //     {/* List content here */}
-    //     <TodoList />
-    //   </Paper>
-
-    //   {/* Chat Area */}
-    //   <Paper
-    //     elevation={3}
-    //     tabIndex={0}
-    //     onClick={() => setFocusArea('chat')}
-    //     onFocus={() => setFocusArea('chat')}
-    //     sx={{
-    //       flexGrow: focusArea === 'chat' ? 8 : 2,
-    //       transition: 'flex-grow 0.3s ease',
-    //       overflow: 'auto',
-    //     }}
-    //   >
-    //     {/* Chat content here */}
-    //     <ChatPanel />
-    //   </Paper>
-    // </Box>
     <Box
       position="relative"
       width="100%"
@@ -646,7 +572,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
       {/* List Window */}
       <Paper
         tabIndex={0}
-        onClick={() => setFocusArea('list')}
+        onFocus={() => setFocusArea('list')}
         sx={{
           position: 'absolute',
           top: 0,
@@ -669,7 +595,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
       {/* Chat Window */}
       <Paper
         tabIndex={0}
-        onClick={() => setFocusArea('chat')}
+        onFocus={() => setFocusArea('chat')}
         sx={{
           position: 'absolute',
           top: 0,
@@ -679,14 +605,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           transform: isMobile
             ? focusArea === 'chat'
               ? 'translateX(10%)'
-              : 'translateX(100%)'
+              : 'translateX(110%)'
             : 'translateX(100%)',
           transition: 'transform 0.3s ease',
           // zIndex: focusArea === 'chat' ? 2 : 1,
         }}
       >
         {/* Chat content */}
-        <ChatPanel />
+        <ChatInterface onTaskCreated={handleTaskCreated} />
       </Paper>
     </Box>
   );
