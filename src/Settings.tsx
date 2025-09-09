@@ -1,7 +1,7 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
-import { Avatar, Box, Button, Card, CardHeader, CardContent, CircularProgress, Divider, IconButton, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, Card, CardHeader, CardContent, CircularProgress, Divider, IconButton, Stack, TextField, Typography } from '@mui/material';
 import { ArrowBackIcon, LogoutIcon, SaveIcon } from './import-mui';
 import { UserContext } from "./Usercontext";
 import { loadSystemPrompt, saveSystemPrompt } from './Promptsetting';
@@ -69,6 +69,8 @@ const NotePage: React.FC = () => {
         </Typography>
       </Stack>
 
+      <Divider sx={{ mt: 2, mb: 2}} />
+
       <Typography variant="h5" gutterBottom>
         AIのペルソナ設定
       </Typography>
@@ -78,7 +80,7 @@ const NotePage: React.FC = () => {
       <TextField
         label="システムプロンプト"
         multiline
-        rows={8}
+        rows={6}
         fullWidth
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
@@ -88,53 +90,31 @@ const NotePage: React.FC = () => {
         variant="contained"
         onClick={handleSave}
         disabled={saving}
-        sx={{ mt: 2 }}
+        sx={{ mt: 2, mb: 2 }}
       >
         {saving ? <CircularProgress size={24} /> : '保存する'}
       </Button>
+      <Button
+        variant="contained"
+        onClick={() => console.log("Reset.")}
+        sx={{ m: 2 }}
+      >
+        リセット
+      </Button>
 
-      {/* {saveStatus === 'success' && (
-        <Alert severity="success" sx={{ mt: 2 }}>保存しました。</Alert>
+      {saveStatus === 'success' && (
+        <Alert severity="success" sx={{ mb: 2 }}>保存しました。</Alert>
       )}
       {saveStatus === 'error' && (
-        <Alert severity="error" sx={{ mt: 2 }}>保存に失敗しました。</Alert>
+        <Alert severity="error" sx={{ mb: 2 }}>保存に失敗しました。</Alert>
       )}
- */}
+
       <Stack spacing={3}>
 
         <Divider />
 
-        <Stack spacing={1}>
-          <Typography variant="body1" gutterBottom>
-              Edit system prompt
-          </Typography>
-
-          <TextField
-              label="System prompt"
-              multiline
-              rows={6}
-              fullWidth
-              variant="outlined"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              sx={{ mb: 3 }}
-          />
-
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<SaveIcon />}
-            onClick={handleSave}
-          >
-            Save
-          </Button>
-        </Stack>
-
-        <Divider />
-
-        <Typography variant="body1" gutterBottom>
-          Sign out of your Google account and return to the start screen.
-          Your data will remain intact.
+        <Typography variant="h5" gutterBottom>
+          使用中のアカウント
         </Typography>
 
         {user && (
@@ -151,6 +131,11 @@ const NotePage: React.FC = () => {
           </CardContent> */}
         </Card>
         )}
+
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Sign out of your Google account and return to the start screen.
+          Your data will remain intact.
+        </Typography>
 
         <Stack spacing={1}>
           <Button
