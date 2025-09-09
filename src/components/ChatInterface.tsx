@@ -39,12 +39,6 @@ const ChatInterface: React.FC<{
     }
   }, [messages]);
   
-  // 音声入力開始
-  const startListening = () => {
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: false, language: 'ja-JP' });
-  };
-  
   // メッセージ送信処理
   const handleSend = async () => {
     if (!user || !input.trim()) return;
@@ -214,7 +208,7 @@ const ChatInterface: React.FC<{
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <IconButton 
             color="primary" 
-            onClick={startListening}
+            onClick={() => SpeechRecognition.startListening({ continuous: false, language: 'ja-JP' })}
             disabled={loading || !browserSupportsSpeechRecognition}
           >
             <MicIcon sx={{ color: listening ? 'error.main' : 'inherit' }} />
