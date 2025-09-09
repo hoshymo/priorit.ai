@@ -204,7 +204,7 @@ const ChatInterface: React.FC<{
       </Box>
       
       {/* 入力エリア */}
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+      <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <IconButton 
             color="primary" 
@@ -222,6 +222,9 @@ const ChatInterface: React.FC<{
             variant="outlined"
             size="small"
             disabled={loading}
+            multiline
+            minRows={1}
+            maxRows={6}
             sx={{ mx: 1 }}
           />
           

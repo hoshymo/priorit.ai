@@ -456,7 +456,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
       <Box sx={{ position: 'fixed', bottom: 20, left: 20, zIndex: 1000 }}>
         <Switch checked={mode === 'dark'} onChange={handleToggleDark} />
       </Box>
-      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
+      <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
         <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
           <SettingsIcon />
         </IconButton>
