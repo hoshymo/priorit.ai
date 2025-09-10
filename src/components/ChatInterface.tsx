@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { useTheme } from '@mui/material/styles';
 import { Box, Paper, Typography, TextField, Button, IconButton, CircularProgress } from '@mui/material';
-import { MicIcon, SendIcon } from '../import-mui';
+import { MicIcon } from '../import-mui'; // SendIconは未使用なので削除
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { UserContext } from '../Usercontext';
-import { getAuth } from "firebase/auth";
+// Firestore関連のインポートを追加
+import { getFirestore, doc, getDoc } from "firebase/firestore"; 
 import { ChatMessage, Task } from '../types';
-import { saveTasks } from '../task';
 
 // 環境変数からバックエンドドメインを取得
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
@@ -24,129 +24,22 @@ const ChatInterface: React.FC<{
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
   const theme = useTheme();
   
-  // 音声認識の結果を入力欄に反映
   useEffect(() => {
     if (transcript) {
       setInput(transcript);
     }
   }, [transcript]);
   
-  // メッセージが追加されたら自動スクロール
   useEffect(() => {
-    // 初期表示時にこれが有効になると表示がおかしくなるので messages が増えたときだけ行う
     if (messages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
   
-  // メッセージ送信処理
-  // const handleSend = async () => {
-  //   if (!user || !input.trim()) return;
-    
-  //   // ユーザーメッセージを追加
-  //   const userMsg: ChatMessage = {
-  //     id: Date.now().toString(),
-  //     sender: 'user',
-  //     content: input,
-  //     timestamp: new Date()
-  //   };
-    
-  //   setMessages(prev => [...prev, userMsg]);
-  //   setInput('');
-  //   resetTranscript();
-  //   setLoading(true);
-    
-  //   try {
-  //     // 会話コンテキスト構築（最新の5メッセージ）
-  //     const recentMessages = messages.slice(-5).map(m => 
-  //       `${m.sender === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`
-  //     ).join('\n');
-      
-  //     // APIリクエスト
-  //     const idtoken = await getAuth()?.currentUser?.getIdToken();
-  //     const response = await fetch(`${BE_DOMAIN}/api/chat`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': `Bearer ${idtoken}`
-  //       },
-  //       body: JSON.stringify({
-  //         message: input,
-  //         context: recentMessages
-  //       })
-  //     });
-      
-  //     if (!response.ok) {
-  //       throw new Error('APIリクエストに失敗しました');
-  //     }
-      
-  //     const data = await response.json();
-      
-  //     // AIメッセージを追加
-  //     const aiMsg: ChatMessage = {
-  //       id: Date.now().toString(),
-  //       sender: 'ai',
-  //       content: data.message,
-  //       timestamp: new Date(),
-  //       suggestedTask: data.extractedTask,
-  //       options: data.options
-  //     };
-      
-  //     setMessages(prev => [...prev, aiMsg]);
-      
-  //     // タスク情報を更新
-  //     setCurrentTask(prev => ({
-  //       ...prev,
-  //       ...data.extractedTask
-  //     }));
-      
-  //     // タスク情報が完成したら保存
-  //     if (data.complete) {
-  //       const finalTask: Task = {
-  //         id: Date.now().toString(),
-  //         task: data.extractedTask.title,
-  //         aiPriority: data.extractedTask.priority === 'high' ? 80 : 
-  //                    data.extractedTask.priority === 'medium' ? 50 : 20,
-  //         dueDate: data.extractedTask.dueDate,
-  //         priority: data.extractedTask.priority,
-  //         status: 'todo',
-  //         reason: data.extractedTask.reason,
-  //         tags: data.extractedTask.tags
-  //       };
-        
-  //       // 既存のタスク配列に追加して保存
-  //       onTaskCreated(finalTask);
-        
-  //       // 確認メッセージ
-  //       setMessages(prev => [...prev, {
-  //         id: Date.now().toString(),
-  //         sender: 'ai',
-  //         content: `タスク「${finalTask.task}」を追加しました！`,
-  //         timestamp: new Date()
-  //       }]);
-        
-  //       // 現在のタスク情報をリセット
-  //       setCurrentTask({});
-  //     }
-  //   } catch (error) {
-  //     console.error('エラー:', error);
-  //     // エラーメッセージ
-  //     setMessages(prev => [...prev, {
-  //       id: Date.now().toString(),
-  //       sender: 'ai',
-  //       content: 'すみません、エラーが発生しました。もう一度お試しください。',
-  //       timestamp: new Date()
-  //     }]);
-  //   }
-    
-  //   setLoading(false);
-  // };
 
-    const handleSend = async () => {
-    // 冒頭のこのチェックでuserの存在を確認しているので、このuserオブジェクトを使いましょう。
+  const handleSend = async () => {
     if (!user || !input.trim()) return;
     
-    // ユーザーメッセージを追加
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
@@ -160,20 +53,26 @@ const ChatInterface: React.FC<{
     setLoading(true);
     
     try {
-      // 会話コンテキスト構築（最新の5メッセージ）
+      // --- ▼▼▼ FirestoreからsystemPromptを取得する処理を追加 ▼▼▼ ---
+      const db = getFirestore();
+      const userSettingsRef = doc(db, 'userSettings', user.uid);
+      const docSnap = await getDoc(userSettingsRef);
+
+      let systemPrompt: string | null = null;
+      if (docSnap.exists() && docSnap.data().systemPrompt) {
+        systemPrompt = docSnap.data().systemPrompt;
+        console.log("System prompt loaded from Firestore on client-side.");
+      } else {
+        console.log("System prompt not found on Firestore. Backend will use its default.");
+      }
+      // --- ▲▲▲ ここまで追加 ▲▲▲ ---
+
       const recentMessages = messages.slice(-5).map(m => 
         `${m.sender === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`
       ).join('\n');
       
-      // --- ▼▼▼ 修正点 ▼▼▼ ---
-      // getAuth().currentUser の代わりに、コンポーネントが保持している `user` オブジェクトから直接トークンを取得します。
       const idtoken = await user.getIdToken();
 
-      // (デバッグ用) トークンが取得できているかコンソールで確認
-      // console.log("ID Token:", idtoken); 
-      // --- ▲▲▲ 修正ここまで ▲▲▲ ---
-
-      // APIリクエスト
       const response = await fetch(`${BE_DOMAIN}/api/chat`, {
         method: 'POST',
         headers: {
@@ -182,12 +81,13 @@ const ChatInterface: React.FC<{
         },
         body: JSON.stringify({
           message: input,
-          context: recentMessages
+          context: recentMessages,
+          // 取得したsystemPromptをbodyに追加（存在しない場合はnull）
+          systemPrompt: systemPrompt 
         })
       });
       
       if (!response.ok) {
-        // サーバーからの具体的なエラーメッセージをログに出力すると、デバッグがしやすくなります。
         const errorData = await response.json();
         console.error("API Error Response:", errorData);
         throw new Error(errorData.error || 'APIリクエストに失敗しました');
@@ -195,7 +95,6 @@ const ChatInterface: React.FC<{
       
       const data = await response.json();
       
-      // AIメッセージを追加
       const aiMsg: ChatMessage = {
         id: Date.now().toString(),
         sender: 'ai',
@@ -207,13 +106,8 @@ const ChatInterface: React.FC<{
       
       setMessages(prev => [...prev, aiMsg]);
       
-      // タスク情報を更新
-      setCurrentTask(prev => ({
-        ...prev,
-        ...data.extractedTask
-      }));
+      setCurrentTask(prev => ({ ...prev, ...data.extractedTask }));
       
-      // タスク情報が完成したら保存
       if (data.complete) {
         const finalTask: Task = {
           id: Date.now().toString(),
