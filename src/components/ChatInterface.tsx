@@ -12,8 +12,10 @@ import { ChatMessage, Task } from '../types';
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
 
 const ChatInterface: React.FC<{
-  onTaskCreated: (task: Task) => void
-}> = ({ onTaskCreated }) => {
+  tasks: Task[];
+  onTaskCreated: (task: Task) => void;
+  onTaskUpdated: (task: Task) => void;
+}> = ({ tasks, onTaskCreated, onTaskUpdated }) => {
   const { user } = useContext(UserContext);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -83,7 +85,8 @@ const ChatInterface: React.FC<{
           message: input,
           context: recentMessages,
           // 取得したsystemPromptをbodyに追加（存在しない場合はnull）
-          systemPrompt: systemPrompt 
+          systemPrompt: systemPrompt ,
+          existingTasks: tasks.filter(t => t.status === 'todo')
         })
       });
       
@@ -107,6 +110,30 @@ const ChatInterface: React.FC<{
       setMessages(prev => [...prev, aiMsg]);
       
       setCurrentTask(prev => ({ ...prev, ...data.extractedTask }));
+      
+      // --- ▼▼▼ actionに応じて処理を振り分ける ▼▼▼ ---
+      if (data.action === 'create' && data.complete) {
+        // タスク情報が完成したら保存 (新規作成)
+        const finalTask: Task = {
+          id: Date.now().toString(),
+          task: data.extractedTask.title,
+          aiPriority: data.extractedTask.priority, // aiPriorityとして受け取る
+          dueDate: data.extractedTask.dueDate,
+          priority: 'medium', // 仮
+          status: 'todo',
+          reason: data.extractedTask.reason,
+          tags: data.extractedTask.tags
+        };
+        onTaskCreated(finalTask);
+        
+        // ... (完了メッセージを追加)
+
+      } else if (data.action === 'update') {
+        // タスクを更新
+        onTaskUpdated(data.updatedTask);
+        
+        // ... (更新完了メッセージを追加しても良い)
+      }
       
       if (data.complete) {
         const finalTask: Task = {

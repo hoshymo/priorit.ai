@@ -124,6 +124,20 @@ const App: React.FC = () => {
     await saveTasks(user.uid, newTasks);
   };
 
+  // --- ▼▼▼ 更新用の関数を追加 ▼▼▼ ---
+  const handleTaskUpdated = async (updatedTaskData: Partial<Task> & { id: string }) => {
+    if (!user) return;
+    const newTasks = tasks.map(task => {
+      if (task.id === updatedTaskData.id) {
+        // スプレッド構文で既存のタスク情報に更新情報をマージ
+        return { ...task, ...updatedTaskData };
+      }
+      return task;
+    });
+    setTasks(newTasks);
+    await saveTasks(user.uid, newTasks);
+  };
+
   const handleAddTaskFromModal = async () => {
     if (!user || !transcript.trim()) return;
     const newTask: Task = {
@@ -734,8 +748,12 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         }}
       >
         {/* Chat content */}
-        <ChatInterface onTaskCreated={handleTaskCreated} />
-      </Paper>
+        {/* --- ▼▼▼ tasksをpropとして渡す ▼▼▼ --- */}
+        <ChatInterface 
+          tasks={tasks} 
+          onTaskCreated={handleTaskCreated} 
+          onTaskUpdated={handleTaskUpdated} // ← Step3で作成
+        />      </Paper>
     </Box>
   );
 
