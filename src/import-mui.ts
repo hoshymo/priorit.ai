@@ -14,4 +14,7 @@ export { default as SendIcon } from '@mui/icons-material/Send';
 export { default as InfoIcon } from '@mui/icons-material/Info';
 export { default as SaveIcon } from '@mui/icons-material/Save';
 export { default as GoogleIcon } from '@mui/icons-material/Google';
+export { default as ThumbUpIcon } from '@mui/icons-material/ThumbUp';
+export { default as ThumbDownIcon } from '@mui/icons-material/ThumbDown';
+export { default as HistoryIcon } from '@mui/icons-material/History';
 // #endregion

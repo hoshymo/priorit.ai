@@ -7,7 +7,7 @@ import { LoginButton } from "./loginbutton";
 import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
 import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Slide, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
-import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, MicIcon, InfoIcon } from './import-mui';
+import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, MicIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
 import ChatInterface from "./components/ChatInterface";
@@ -44,6 +44,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [inputTask, setInputTask] = useState("");
   
+   const [openHistoryModal, setOpenHistoryModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [openEditModal, setOpenEditModal] = useState(false);
 
@@ -59,6 +60,8 @@ const App: React.FC = () => {
 
   const [focusArea, setFocusArea] = useState<'list' | 'chat'>('list');
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // 600px以下
+
+  const todoTasks = tasks.filter(t => t.status === 'todo');
 
   useEffect(() => {
     if (user) {
@@ -173,18 +176,60 @@ const App: React.FC = () => {
     await saveTasks(user.uid, newTasks);
     handleCloseEditModal();
   };
-  
+
+  const handleToggleTaskStatus = async (taskId: string) => {
+    if (!user) return;
+    
+    // mapのコールバック関数の返り値の型を明示的に指定
+    const newTasks = tasks.map((task): Task => { 
+      if (task.id === taskId) {
+        return { 
+          ...task, 
+          status: task.status === 'todo' ? 'done' : 'todo' 
+        };
+      }
+      return task;
+    });
+
+    setTasks(newTasks);
+    await saveTasks(user.uid, newTasks);
+  };
+
   const handleEditInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!editingTask) return;
     setEditingTask({ ...editingTask, task: event.target.value });
   };
-  
-// 編集中のタスクの「ユーザー優先度」をスライダーで変更するためのハンドラ
-    const handleEditUserPriorityChange = (event: Event, newValue: number | number[]) => {
-    if (!editingTask) return;
-    setEditingTask({ ...editingTask, userPriority: newValue as number });
-    };
 
+  const handleUserPriorityAdjustment = (adjustment: number) => {
+    if (!editingTask) return;
+    
+    // 現在の優先度を取得。未設定(null or undefined)の場合はデフォルト値の50を基準にする
+    const currentPriority = editingTask.userPriority ?? 50;
+    
+    // 優先度を調整し、0〜100の範囲に収める
+    const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
+    
+    // stateを更新
+    setEditingTask({ ...editingTask, userPriority: newPriority });
+  };
+  
+const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
+    if (!user) return;
+    
+    const newTasks = tasks.map(task => {
+      // IDが一致するタスクを見つけたら、優先度を更新
+      if (task.id === taskId) {
+        const currentPriority = task.userPriority ?? 50; // 未設定の場合は50を基準
+        const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
+        return { ...task, userPriority: newPriority };
+      }
+      return task; // IDが違うタスクはそのまま返す
+    });
+
+    setTasks(newTasks); // UIを更新
+    await saveTasks(user.uid, newTasks); // 変更をDBに保存
+  };
+  
   const handleCloseMicModal = () => {
     setOpenMicModal(false);
     SpeechRecognition.stopListening();
@@ -288,7 +333,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
 
             {(() => {
             // 事前にソート済みのタスク配列を準備
-            const sortedTasks = tasks
+            const sortedTasks = todoTasks
                 .slice()
                 .sort((a, b) => {
                 const userPriorityA = a.userPriority || 50; // 未設定は中間値として扱う
@@ -366,8 +411,12 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                 )}
                             </Typography>
                             <Box>
-                                <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                                <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
+                              {/* --- ▼▼▼ 完了ボタンを追加 ▼▼▼ --- */}
+                              <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small">
+                                <CheckIcon />
+                              </IconButton>
+                              <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
+                              <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
                             </Box>
                             </Box>
                             
@@ -385,6 +434,15 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                 </Box>
                             )}
                             </Typography>
+
+                            <Box>
+                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
+                                <ThumbDownIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, 10)}>
+                                <ThumbUpIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
                         </CardContent>
                   </CardWrapper>
                 );})}
@@ -410,11 +468,16 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                         )}
                                     </Typography>
                                     <Box>
-                                        <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                                        <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
+                                      {/* --- ▼▼▼ 完了ボタンを追加 ▼▼▼ --- */}
+                                      <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small">
+                                        <CheckIcon />
+                                      </IconButton>
+                                      <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
+                                      <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
                                     </Box>
+
                                     </Box>
-                                    
+                                  
                                     <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
                                     AI優先度: {t.aiPriority}
                                     
@@ -428,7 +491,16 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                         ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
                                         </Box>
                                     )}
-                                    </Typography>                
+                                    </Typography>       
+
+                                    <Box>
+                                      <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
+                                        <ThumbDownIcon fontSize="small" />
+                                      </IconButton>
+                                      <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, 10)}>
+                                        <ThumbUpIcon fontSize="small" />
+                                      </IconButton>
+                                    </Box>         
                                 </CardContent>
                             </Card>
                         ))}
@@ -460,6 +532,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         <Switch checked={mode === 'dark'} onChange={handleToggleDark} />
       </Box>
       <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
+              {/* --- ▼▼▼ 履歴ボタンを追加 ▼▼▼ --- */}
+        <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <HistoryIcon />
+        </IconButton>
         <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
           <SettingsIcon />
         </IconButton>
@@ -500,19 +576,25 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         <DialogTitle>タスクの編集</DialogTitle>
         <DialogContent>
           <TextField autoFocus margin="dense" label="タスク内容" type="text" fullWidth variant="standard" value={editingTask?.task || ""} onChange={handleEditInputChange} sx={{ mb: 4 }} />
-            <Typography gutterBottom>ユーザー優先度: {editingTask?.userPriority || '未設定'}</Typography>
-            <Slider
-            value={editingTask?.userPriority || 50} // 未設定なら中央値の50を表示
-            onChange={handleEditUserPriorityChange}  // 上で用意したハンドラを紐付け
-            aria-labelledby="user-priority-slider"
-            valueLabelDisplay="auto"
-            step={1}
-            marks
-            min={0}
-            max={100}
-            />         
-            {/* <Slider value={editingTask?.aiPriority || 50} onChange={handleEditPriorityChange} valueLabelDisplay="auto" step={1} marks min={1} max={100} /> */}
-        </DialogContent>
+          <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Typography variant="caption" display="block">
+              ユーザー優先度
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+              <IconButton color="error" onClick={() => handleUserPriorityAdjustment(-10)} size="large">
+                <ThumbDownIcon />
+              </IconButton>
+              
+              <Typography variant="h5" component="div" sx={{ minWidth: 60, textAlign: 'center' }}>
+                {editingTask?.userPriority ?? 50}
+              </Typography>
+
+              <IconButton color="primary" onClick={() => handleUserPriorityAdjustment(10)} size="large">
+                <ThumbUpIcon />
+              </IconButton>
+            </Box>
+          </Box>
+          </DialogContent>
         <DialogActions>
             <Button onClick={handleCloseEditModal}>キャンセル</Button>
             <Button 
@@ -524,6 +606,43 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             </Button>
         </DialogActions>      
         </Dialog>
+
+        <Dialog open={openHistoryModal} onClose={() => setOpenHistoryModal(false)} fullWidth scroll="paper">
+        <DialogTitle>完了したタスクの履歴</DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'grid', gap: 1, mt: 1 }}>
+            {tasks
+              .filter(t => t.status === 'done') // 完了タスクのみフィルタリング
+              .map((t) => (
+                <Card key={t.id} sx={{ opacity: 0.8 }}>
+                  <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}> {/* Paddingを調整 */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography sx={{ textDecoration: 'line-through' }}>
+                        {t.task}
+                      </Typography>
+                      <Box>
+                        <Button size="small" onClick={() => handleToggleTaskStatus(t.id)}>
+                          戻す
+                        </Button>
+                        <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small">
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+            ))}
+            {tasks.filter(t => t.status === 'done').length === 0 && (
+              <Typography color="text.secondary" sx={{ textAlign: 'center', my: 4 }}>
+                完了したタスクはありません
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenHistoryModal(false)}>閉じる</Button>
+        </DialogActions>
+      </Dialog>
       </Box>
   )};
 
@@ -620,6 +739,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     </Box>
   );
 
+  
 };
 
 export default App;
