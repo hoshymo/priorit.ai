@@ -12,6 +12,7 @@ import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
 import ChatInterface from "./components/ChatInterface";
 import { Task } from "./types";
+import { useSnackbar } from 'notistack';
 
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
@@ -63,40 +64,56 @@ const App: React.FC = () => {
 
   const todoTasks = tasks.filter(t => t.status === 'todo');
 
-  useEffect(() => {
-    if (user) {
-      loadTasks(user.uid).then((data) => {
-        setTasks(fixTaskArray(data || []));
-      });
-    } else {
-      setTasks([]);
-    }
+  const { enqueueSnackbar } = useSnackbar(); // ★ Snackbar用のhookを呼び出し
+  const [suggestionFetched, setSuggestionFetched] = useState(false); // ★ サジェストの多重実行を防ぐフラグ
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
 
-    if(user){
-      console.log(user.uid);
+ // --- ▼▼▼ このuseEffectを修正または追加 ▼▼▼ ---
+  useEffect(() => {
+    // ユーザーがいて、まだサジェスト機能が実行されていない場合
+    if (user && !suggestionFetched) {
+      loadTasks(user.uid).then(async (data) => {
+        const loadedTasks = fixTaskArray(data || []);
+        setTasks(loadedTasks);
+        
+        // タスクが1件以上ある場合のみサジェスト機能を発火
+        if (loadedTasks.length > 0) {
+          setSuggestionFetched(true); // 実行フラグを立てて再実行を防ぐ
+          
+          try {
+            const idtoken = await user.getIdToken();
+            const response = await fetch(`${BE_DOMAIN}/api/suggest`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idtoken}`
+              },
+              // 未完了のタスクだけをAIに渡す
+              body: JSON.stringify({ tasks: loadedTasks.filter(t => t.status === 'todo') }),
+            });
+
+            if (!response.ok) throw new Error('サジェストの取得に失敗');
+
+            const suggestion = await response.json();
+            
+            // AIからのコメントがあれば通知として表示
+            if (suggestion.comment) {
+              enqueueSnackbar(suggestion.comment, { variant: 'info' });
+              setHighlightedTaskId(suggestion.suggestedTaskId);
+              // (発展) サジェストされたタスクをハイライトするなどの演出も可能
+            }
+          } catch (error) {
+            console.error("サジェスト機能のエラー:", error);
+            // エラーが発生したことはユーザーに通知しない（サイレントフェイル）
+          }
+        }
+      });
+    } else if (!user) {
+      // ログアウト時などに状態をリセット
+      setTasks([]);
+      setSuggestionFetched(false); 
     }
-    // SpeechRecognition の event handler 例
-    // const recognition = SpeechRecognition.getRecognition();
-    // console.log("recognition:");
-    // console.log(recognition);
-    // if (recognition) {
-    //   recognition.onstart = () => {
-    //     console.log('Speech recognition started');
-    //   };
-    //   recognition.onaudiostart = () => {
-    //     console.log('Speech recognition: audio started.');
-    //   };
-    //   recognition.onaudioend = () => {
-    //     console.log('Speech recognition: audio ended.');
-    //   };
-    //   recognition.onerror = (event) => {
-    //     console.error('SpeechRecognition error:', event.error);
-    //     console.log('Error details:', event);
-    //   };
-    // } else {
-    //   console.warn('SpeechRecognition is not supported in this browser.');
-    // }
-  }, [user]);
+  }, [user, suggestionFetched, enqueueSnackbar]);
 
   // --- タスク追加時のaiPriorityをデフォルト値(50)に設定 ---
   const handleAddTaskManual = async () => {

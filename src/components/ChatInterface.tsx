@@ -134,7 +134,7 @@ const ChatInterface: React.FC<{
         
         // ... (更新完了メッセージを追加しても良い)
       }
-      
+
       if (data.complete) {
         const finalTask: Task = {
           id: Date.now().toString(),

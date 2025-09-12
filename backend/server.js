@@ -97,6 +97,68 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
+app.post('/api/suggest', async (req, res) => {
+  // 認証チェック (既存のコードを再利用・共通化推奨)
+  const idToken = req.headers.authorization?.split('Bearer ')[1];
+  if (!idToken && !passIdTokenVerify) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  // ... (必要に応じてverifyIdToken)
+
+  try {
+    const { tasks } = req.body; // フロントエンドからタスクリストを受け取る
+
+    // タスクがなければ処理を中断
+    if (!tasks || tasks.length === 0) {
+      return res.status(200).json({ comment: "ようこそ！まずは最初のタスクを追加してみましょう！" });
+    }
+
+    const prompt = `
+あなたはユーザーのタスク管理をサポートする、ポジティブで気の利いたAIアシスタントです。
+
+# 指示
+以下のタスクリストの中から、今日取り組むべき最も重要だと思われるタスクを1つだけ選び、ユーザーを励ます短いコメントを生成してください。
+
+1.  タスクのタイトル、期限、優先度を総合的に評価し、最も重要・緊急なタスクを1つ特定します。
+2.  なぜそのタスクが重要なのかを考えます。
+3.  その理由を踏まえ、ユーザーが「よし、やろう！」と思えるような、**ポジティブで気の利いた一言コメント**（50字以内）を作成してください。
+4.  以下のJSON形式で、選んだタスクのIDと生成したコメントを返してください。
+
+# 既存のタスクリスト
+${JSON.stringify(tasks, null, 2)}
+
+# レスポンス形式
+{
+  "suggestedTaskId": "（特定したタスクのID）",
+  "comment": "（生成したコメント）"
+}
+`;
+
+    // Gemini API呼び出し (既存のコードを参考)
+    const result = await axios.post(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + process.env.REACT_APP_GEMINI_API_KEY,
+      {
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        safetySettings: [/* ... */]
+      },
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+
+    // レスポンス処理
+    const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      res.json(JSON.parse(jsonMatch[0]));
+    } else {
+      res.status(500).json({ error: "AIからの応答を解析できませんでした。" });
+    }
+
+  } catch (e) {
+    console.error("API Error in /api/suggest:", e.response?.data || e.message);
+    res.status(500).json({ error: "サジェストの生成中にエラーが発生しました。" });
+  }
+});
+
 // 新しいエンドポイント: チャットメッセージ処理
 // app.post('/api/chat', async (req, res) => {
 //   // 認証チェック（既存コードと同様）
