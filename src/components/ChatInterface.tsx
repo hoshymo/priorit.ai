@@ -1,19 +1,21 @@
 import React, { useState, useRef, useEffect, useContext } from 'react';
 import { useTheme } from '@mui/material/styles';
-import { Box, Paper, Typography, TextField, Button, IconButton, CircularProgress } from '../import-mui';
-import { MicIcon, SendIcon } from '../import-mui';
+import { Box, Paper, Typography, TextField, Button, IconButton, CircularProgress } from '@mui/material';
+import { MicIcon } from '../import-mui'; // SendIconは未使用なので削除
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { UserContext } from '../Usercontext';
-import { getAuth } from "firebase/auth";
+// Firestore関連のインポートを追加
+import { getFirestore, doc, getDoc } from "firebase/firestore"; 
 import { ChatMessage, Task } from '../types';
-import { saveTasks } from '../task';
 
 // 環境変数からバックエンドドメインを取得
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
 
 const ChatInterface: React.FC<{
-  onTaskCreated: (task: Task) => void
-}> = ({ onTaskCreated }) => {
+  tasks: Task[];
+  onTaskCreated: (task: Task) => void;
+  onTaskUpdated: (task: Task) => void;
+}> = ({ tasks, onTaskCreated, onTaskUpdated }) => {
   const { user } = useContext(UserContext);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -24,29 +26,22 @@ const ChatInterface: React.FC<{
   const { transcript, listening, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition();
   const theme = useTheme();
   
-  // 音声認識の結果を入力欄に反映
   useEffect(() => {
     if (transcript) {
       setInput(transcript);
     }
   }, [transcript]);
   
-  // メッセージが追加されたら自動スクロール
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
   
-  // 音声入力開始
-  const startListening = () => {
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: false, language: 'ja-JP' });
-  };
-  
-  // メッセージ送信処理
+
   const handleSend = async () => {
     if (!user || !input.trim()) return;
     
-    // ユーザーメッセージを追加
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
@@ -60,13 +55,22 @@ const ChatInterface: React.FC<{
     setLoading(true);
     
     try {
-      // 会話コンテキスト構築（最新の5メッセージ）
+      // FirestoreからsystemPromptを取得する処理
+      const db = getFirestore();
+      const userSettingsRef = doc(db, 'userSettings', user.uid);
+      const docSnap = await getDoc(userSettingsRef);
+
+      let systemPrompt: string | null = null;
+      if (docSnap.exists() && docSnap.data().systemPrompt) {
+        systemPrompt = docSnap.data().systemPrompt;
+      }
+
       const recentMessages = messages.slice(-5).map(m => 
         `${m.sender === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`
       ).join('\n');
       
-      // APIリクエスト
-      const idtoken = await getAuth()?.currentUser?.getIdToken();
+      const idtoken = await user.getIdToken();
+
       const response = await fetch(`${BE_DOMAIN}/api/chat`, {
         method: 'POST',
         headers: {
@@ -75,17 +79,21 @@ const ChatInterface: React.FC<{
         },
         body: JSON.stringify({
           message: input,
-          context: recentMessages
+          context: recentMessages,
+          // 取得したsystemPromptをbodyに追加（存在しない場合はnull）
+          systemPrompt: systemPrompt ,
+          existingTasks: tasks.filter(t => t.status === 'todo')
         })
       });
       
       if (!response.ok) {
-        throw new Error('APIリクエストに失敗しました');
+        const errorData = await response.json();
+        console.error("API Error Response:", errorData);
+        throw new Error(errorData.error || 'APIリクエストに失敗しました');
       }
       
       const data = await response.json();
       
-      // AIメッセージを追加
       const aiMsg: ChatMessage = {
         id: Date.now().toString(),
         sender: 'ai',
@@ -97,13 +105,32 @@ const ChatInterface: React.FC<{
       
       setMessages(prev => [...prev, aiMsg]);
       
-      // タスク情報を更新
-      setCurrentTask(prev => ({
-        ...prev,
-        ...data.extractedTask
-      }));
+      setCurrentTask(prev => ({ ...prev, ...data.extractedTask }));
       
-      // タスク情報が完成したら保存
+      // --- ▼▼▼ actionに応じて処理を振り分ける ▼▼▼ ---
+      if (data.action === 'create' && data.complete) {
+        // タスク情報が完成したら保存 (新規作成)
+        const finalTask: Task = {
+          id: Date.now().toString(),
+          task: data.extractedTask.title,
+          aiPriority: data.extractedTask.priority, // aiPriorityとして受け取る
+          dueDate: data.extractedTask.dueDate,
+          priority: 'medium', // 仮
+          status: 'todo',
+          reason: data.extractedTask.reason,
+          tags: data.extractedTask.tags
+        };
+        onTaskCreated(finalTask);
+        
+        // ... (完了メッセージを追加)
+
+      } else if (data.action === 'update') {
+        // タスクを更新
+        onTaskUpdated(data.updatedTask);
+        
+        // ... (更新完了メッセージを追加しても良い)
+      }
+
       if (data.complete) {
         const finalTask: Task = {
           id: Date.now().toString(),
@@ -117,10 +144,8 @@ const ChatInterface: React.FC<{
           tags: data.extractedTask.tags
         };
         
-        // 既存のタスク配列に追加して保存
         onTaskCreated(finalTask);
         
-        // 確認メッセージ
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
           sender: 'ai',
@@ -128,12 +153,10 @@ const ChatInterface: React.FC<{
           timestamp: new Date()
         }]);
         
-        // 現在のタスク情報をリセット
         setCurrentTask({});
       }
     } catch (error) {
       console.error('エラー:', error);
-      // エラーメッセージ
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         sender: 'ai',
@@ -144,6 +167,7 @@ const ChatInterface: React.FC<{
     
     setLoading(false);
   };
+
   
   // 選択肢クリック処理
   const handleOptionClick = (option: string) => {
@@ -152,7 +176,7 @@ const ChatInterface: React.FC<{
   };
   
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '70vh' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh' }}>
       {/* メッセージ表示エリア */}
       <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
         {messages.length === 0 && (
@@ -207,11 +231,11 @@ const ChatInterface: React.FC<{
       </Box>
       
       {/* 入力エリア */}
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+      <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <IconButton 
             color="primary" 
-            onClick={startListening}
+            onClick={() => SpeechRecognition.startListening({ continuous: false, language: 'ja-JP' })}
             disabled={loading || !browserSupportsSpeechRecognition}
           >
             <MicIcon sx={{ color: listening ? 'error.main' : 'inherit' }} />
@@ -225,6 +249,9 @@ const ChatInterface: React.FC<{
             variant="outlined"
             size="small"
             disabled={loading}
+            multiline
+            minRows={1}
+            maxRows={6}
             sx={{ mx: 1 }}
           />
           

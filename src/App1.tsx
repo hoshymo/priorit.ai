@@ -1,16 +1,19 @@
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
+import { useSwipeable } from 'react-swipeable';
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
+import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
-import { Box, Card, CardContent, IconButton, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Slider, ToggleButtonGroup, ToggleButton, Switch, Collapse, Paper, Tooltip } from './import-mui';
-import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, MicIcon, InfoIcon } from './import-mui';
+import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Slide, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
+import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
 import ChatInterface from "./components/ChatInterface";
 import { Task } from "./types";
+import { useSnackbar } from 'notistack';
 
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
@@ -43,6 +46,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [inputTask, setInputTask] = useState("");
   
+   const [openHistoryModal, setOpenHistoryModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [openEditModal, setOpenEditModal] = useState(false);
 
@@ -56,37 +60,68 @@ const App: React.FC = () => {
   const { mode, setMode } = themeContext;
   const theme = useTheme();
 
-  useEffect(() => {
-    if (user) {
-      loadTasks(user.uid).then((data) => {
-        setTasks(fixTaskArray(data || []));
-      });
-    } else {
-      setTasks([]);
-    }
+  const [focusArea, setFocusArea] = useState<'list' | 'chat'>('list');
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // 600px以下
 
-    // SpeechRecognition の event handler 例
-    // const recognition = SpeechRecognition.getRecognition();
-    // console.log("recognition:");
-    // console.log(recognition);
-    // if (recognition) {
-    //   recognition.onstart = () => {
-    //     console.log('Speech recognition started');
-    //   };
-    //   recognition.onaudiostart = () => {
-    //     console.log('Speech recognition: audio started.');
-    //   };
-    //   recognition.onaudioend = () => {
-    //     console.log('Speech recognition: audio ended.');
-    //   };
-    //   recognition.onerror = (event) => {
-    //     console.error('SpeechRecognition error:', event.error);
-    //     console.log('Error details:', event);
-    //   };
-    // } else {
-    //   console.warn('SpeechRecognition is not supported in this browser.');
-    // }
-  }, [user]);
+  const todoTasks = tasks.filter(t => t.status === 'todo');
+
+  const { enqueueSnackbar } = useSnackbar(); // ★ Snackbar用のhookを呼び出し
+  const [suggestionFetched, setSuggestionFetched] = useState(false); // ★ サジェストの多重実行を防ぐフラグ
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const [suggestionComment, setSuggestionComment] = useState<string | null>(null); // ← 新しく追加
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+
+  const pulseGlow = keyframes`
+  0% { box-shadow: 0 0 5px 2px rgba(25, 118, 210, 0.4); }
+  50% { box-shadow: 0 0 15px 5px rgba(25, 118, 210, 0.8); }
+  100% { box-shadow: 0 0 5px 2px rgba(25, 118, 210, 0.4); }
+`;
+  useEffect(() => {
+    // ユーザーがいて、まだサジェスト機能が実行されていない場合
+    if (user && !suggestionFetched) {
+      loadTasks(user.uid).then(async (data) => {
+        const loadedTasks = fixTaskArray(data || []);
+        setTasks(loadedTasks);
+        
+        // タスクが1件以上ある場合のみサジェスト機能を発火
+        if (loadedTasks.length > 0) {
+          setSuggestionFetched(true); // 実行フラグを立てて再実行を防ぐ
+          
+          try {
+            const idtoken = await user.getIdToken();
+            const response = await fetch(`${BE_DOMAIN}/api/suggest`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idtoken}`
+              },
+              // 未完了のタスクだけをAIに渡す
+              body: JSON.stringify({ tasks: loadedTasks.filter(t => t.status === 'todo') }),
+            });
+
+            if (!response.ok) throw new Error('サジェストの取得に失敗');
+
+            const suggestion = await response.json();
+            
+            // AIからのコメントがあれば通知として表示
+            if (suggestion.comment) {
+              setSuggestionComment(suggestion.comment);
+              setHighlightedTaskId(suggestion.suggestedTaskId);
+              setShowSuggestionModal(true);
+              // (発展) サジェストされたタスクをハイライトするなどの演出も可能
+            }
+          } catch (error) {
+            console.error("サジェスト機能のエラー:", error);
+            // エラーが発生したことはユーザーに通知しない（サイレントフェイル）
+          }
+        }
+      });
+    } else if (!user) {
+      // ログアウト時などに状態をリセット
+      setTasks([]);
+      setSuggestionFetched(false); 
+    }
+  }, [user, suggestionFetched]);
 
   // --- タスク追加時のaiPriorityをデフォルト値(50)に設定 ---
   const handleAddTaskManual = async () => {
@@ -110,6 +145,19 @@ const App: React.FC = () => {
     
     // 既存のタスク配列に追加
     const newTasks = [...tasks, newTask];
+    setTasks(newTasks);
+    await saveTasks(user.uid, newTasks);
+  };
+
+  const handleTaskUpdated = async (updatedTaskData: Partial<Task> & { id: string }) => {
+    if (!user) return;
+    const newTasks = tasks.map(task => {
+      if (task.id === updatedTaskData.id) {
+        // スプレッド構文で既存のタスク情報に更新情報をマージ
+        return { ...task, ...updatedTaskData };
+      }
+      return task;
+    });
     setTasks(newTasks);
     await saveTasks(user.uid, newTasks);
   };
@@ -166,28 +214,72 @@ const App: React.FC = () => {
     await saveTasks(user.uid, newTasks);
     handleCloseEditModal();
   };
-  
+
+  const handleToggleTaskStatus = async (taskId: string) => {
+    if (!user) return;
+    
+    // mapのコールバック関数の返り値の型を明示的に指定
+    const newTasks = tasks.map((task): Task => { 
+      if (task.id === taskId) {
+        return { 
+          ...task, 
+          status: task.status === 'todo' ? 'done' : 'todo' 
+        };
+      }
+      return task;
+    });
+
+    setTasks(newTasks);
+    await saveTasks(user.uid, newTasks);
+  };
+
   const handleEditInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!editingTask) return;
     setEditingTask({ ...editingTask, task: event.target.value });
   };
-  
-// 編集中のタスクの「ユーザー優先度」をスライダーで変更するためのハンドラ
-    const handleEditUserPriorityChange = (event: Event, newValue: number | number[]) => {
-    if (!editingTask) return;
-    setEditingTask({ ...editingTask, userPriority: newValue as number });
-    };
 
+  const handleUserPriorityAdjustment = (adjustment: number) => {
+    if (!editingTask) return;
+    
+    // 現在の優先度を取得。未設定(null or undefined)の場合はデフォルト値の50を基準にする
+    const currentPriority = editingTask.userPriority ?? 50;
+    
+    // 優先度を調整し、0〜100の範囲に収める
+    const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
+    
+    // stateを更新
+    setEditingTask({ ...editingTask, userPriority: newPriority });
+  };
+  
+const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
+    if (!user) return;
+    
+    const newTasks = tasks.map(task => {
+      // IDが一致するタスクを見つけたら、優先度を更新
+      if (task.id === taskId) {
+        const currentPriority = task.userPriority ?? 50; // 未設定の場合は50を基準
+        const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
+        return { ...task, userPriority: newPriority };
+      }
+      return task; // IDが違うタスクはそのまま返す
+    });
+
+    setTasks(newTasks); // UIを更新
+    await saveTasks(user.uid, newTasks); // 変更をDBに保存
+  };
+  
   const handleCloseMicModal = () => {
     setOpenMicModal(false);
     SpeechRecognition.stopListening();
     resetTranscript();
   };
   
-  const handleOpenMicModal = () => {
-    resetTranscript();
-    SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
-    setOpenMicModal(true);
+  const handleOpenMicModal = (e: { stopPropagation: () => void; }) => {
+    // resetTranscript();
+    // SpeechRecognition.startListening({ continuous: false, language: "ja-JP" });
+    // setOpenMicModal(true);
+    e.stopPropagation(); // click することでこの panel に focus が来てしまうのを防ぐ
+    setFocusArea(focusArea == 'list' ? 'chat' : 'list');
   };
 
   // --- LLMの優先度付け機能を修正 ---
@@ -249,6 +341,19 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     setMode((mode === 'light' ? 'dark' : 'light'));
   };
 
+  const GlowingCard = styled(Card)(({ theme }) => ({
+  animation: `${pulseGlow} 1.5s 4`,
+  }));
+
+  const swipeHandlers = useSwipeable({
+      onSwiped: (eventData) => {
+        // console.log("User Swiped!", eventData.dir);
+        if (eventData.dir === 'Right')
+          setFocusArea(focusArea == 'chat' ? 'list' : 'chat');
+      }
+  });
+
+
   if (!authChecked) return (
       <Box
         sx={{
@@ -259,62 +364,45 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         }}
       >
         <Typography variant="subtitle2" sx={{ color: '#000000a0' }}>
-          Just a mmoment...
+          Just a moment...
         </Typography>
       </Box>
     );
   if (!user) return <LoginButton />;
 
-  return (
+  const TodoList = () => {
+    return (
     <Box sx={{
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
+        height: '100%',
         width: '100%'
       }}
     >
-        <Box sx={{ width: '96%', display: 'grid', gap:1, mt: 2 }}>
 
-      {/* チャットインターフェース切り替えボタン */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'center' }}>
-        <Button
-          variant={showChat ? "outlined" : "contained"}
-          onClick={() => setShowChat(false)}
-          sx={{ mr: 1 }}
-        >
-          タスクリスト
-        </Button>
-        <Button
-          variant={showChat ? "contained" : "outlined"}
-          onClick={() => setShowChat(true)}
-        >
-          チャットで追加
-        </Button>
-      </Box>
-      
-      {showChat ? (
-        // チャットインターフェース
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <ChatInterface onTaskCreated={handleTaskCreated} />
-        </Paper>
-      ) : (
-        // 既存のタスク入力フォーム
-        <div style={{ marginBottom: 16, display: 'flex' }}>
-          <TextField
-            value={inputTask}
-            onChange={e => setInputTask(e.target.value)}
-            placeholder="タスクを手入力"
-            variant="outlined"
-            size="small"
-            fullWidth
-          />
-          <Button onClick={handleAddTaskManual} disabled={!inputTask.trim()} variant="contained" sx={{ ml: 1 }}>追加</Button>
-        </div>
-      )}
+      <Dialog open={showSuggestionModal} onClose={() => setShowSuggestionModal(false)}>
+        <DialogTitle>今日はこのタスクを先に進めると、一番効果的かも！</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            {suggestionComment}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          {/* ハイライトボタン（任意） */}
+          <Button onClick={() => {
+            setShowSuggestionModal(false);
+            setHighlightedTaskId(null); // ハイライトを解除
+          }} color="secondary">
+            閉じる
+          </Button>
+        </DialogActions>
+      </Dialog>
+        <Box sx={{ width: '96%', display: 'grid', gap:1 }}>
 
             {(() => {
             // 事前にソート済みのタスク配列を準備
-            const sortedTasks = tasks
+            const sortedTasks = todoTasks
                 .slice()
                 .sort((a, b) => {
                 const userPriorityA = a.userPriority || 50; // 未設定は中間値として扱う
@@ -335,7 +423,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
               position: 'relative',
               zIndex: 0,
               borderRadius: theme.shape.borderRadius,
-              padding: theme.spacing(2),
+              padding: theme.spacing(1),
               overflow: 'hidden',
               // 枠の背景を回転させる擬似要素
               '&::before': {
@@ -346,7 +434,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                 right: '-819px',
                 bottom: '-819px',
                 borderRadius: 'inherit',
-                padding: '4px',
+                // padding: '4px',
                 background: 'conic-gradient(red, orange, indigo, violet, red)',
                 // background: 'conic-gradient(red, orange, yellow, green, blue, indigo, violet, red)',
                 animation: `${rainbowSpin} 12s linear infinite`,
@@ -370,18 +458,31 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
               borderImage: 'linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet) 1',
               borderRadius: '12px',
             });
-
-            return (
-                <>
-                {/* --- TOP3タスクの表示 --- */}
-                {topTasks.map((t) => {
-                    const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : Card;
+            const TaskCard = (t: Task) => {
+                    const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : 
+                      t.id === highlightedTaskId ? GlowingCard : Card;
                     return (
-                    <CardWrapper style={{marginBottom: 0.5}} key={t.id}>
+                    <CardWrapper key={t.id}>
                         <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Typography variant="h6" component="div">
                                 {t.task}
+                            </Typography>
+                            </Box>
+
+                        </CardContent>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1 }}>
+                            <Box>
+                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
+                                <ThumbDownIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, 10)}>
+                                <ThumbUpIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                              優先度: {t.aiPriority}
                                 {/* 理由表示用ツールチップ */}
                                 {t.reason && (
                                   <Tooltip title={t.reason}>
@@ -390,16 +491,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                     </IconButton>
                                   </Tooltip>
                                 )}
-                            </Typography>
-                            <Box>
-                                <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                                <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
-                            </Box>
-                            </Box>
-                            
-                            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                            AI優先度: {t.aiPriority}
-                            
                             {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
                             {t.userPriority != null && (
                                 <Box component="span" sx={{ 
@@ -411,53 +502,27 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                 </Box>
                             )}
                             </Typography>
-                        </CardContent>
+                            <Box>
+                              <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small"><CheckIcon /></IconButton>
+                              <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
+                              <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
+                            </Box>
+                        </Box>
                   </CardWrapper>
-                );})}
+                  );
+            }
+
+            return (
+                <>
+                {/* --- TOP3タスクの表示 --- */}
+                {topTasks.map((t) => TaskCard(t))}
 
                 {/* --- 4件目以降のタスクをCollapseで囲む --- */}
                 {remainingTasks.length > 0 && (
                     <>
                     <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                         <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
-                        {remainingTasks.map((t) => (
-                            <Card style={{marginBottom: 0.5}} key={t.id}>
-                                <CardContent>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                    <Typography variant="h6" component="div">
-                                        {t.task}
-                                        {/* 理由表示用ツールチップ */}
-                                        {t.reason && (
-                                          <Tooltip title={t.reason}>
-                                            <IconButton size="small">
-                                              <InfoIcon fontSize="small" />
-                                            </IconButton>
-                                          </Tooltip>
-                                        )}
-                                    </Typography>
-                                    <Box>
-                                        <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                                        <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
-                                    </Box>
-                                    </Box>
-                                    
-                                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                                    AI優先度: {t.aiPriority}
-                                    
-                                    {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
-                                    {t.userPriority != null && (
-                                        <Box component="span" sx={{ 
-                                        color: '#1976d2', // MUIのデフォルトの青色
-                                        fontWeight: 'bold',
-                                        ml: 1 // marginLeft
-                                        }}>
-                                        ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
-                                        </Box>
-                                    )}
-                                    </Typography>                
-                                </CardContent>
-                            </Card>
-                        ))}
+                        {remainingTasks.map((t) => TaskCard(t))}
                         </Box>
                     </Collapse>
                     
@@ -482,17 +547,17 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         </Box>
 
       {/* --- 右下固定ボタン --- */}
-      <Box sx={{ position: 'fixed', bottom: 20, left: 20, zIndex: 1000 }}>
-        <Switch checked={mode === 'dark'} onChange={handleToggleDark} />
-      </Box>
-      <Box sx={{ position: 'fixed', bottom: 20, right: 20, zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
+      <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
         <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
           <SettingsIcon />
+        </IconButton>
+        <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <HistoryIcon />
         </IconButton>
       {/* --- 音声入力開始ボタン --- チャットモードでは非表示 */}
       {!showChat && (
         <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <MicIcon fontSize="large" />
+          <ChatIcon fontSize="large" />
         </IconButton>
       )}
       </Box>
@@ -526,19 +591,25 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         <DialogTitle>タスクの編集</DialogTitle>
         <DialogContent>
           <TextField autoFocus margin="dense" label="タスク内容" type="text" fullWidth variant="standard" value={editingTask?.task || ""} onChange={handleEditInputChange} sx={{ mb: 4 }} />
-            <Typography gutterBottom>ユーザー優先度: {editingTask?.userPriority || '未設定'}</Typography>
-            <Slider
-            value={editingTask?.userPriority || 50} // 未設定なら中央値の50を表示
-            onChange={handleEditUserPriorityChange}  // 上で用意したハンドラを紐付け
-            aria-labelledby="user-priority-slider"
-            valueLabelDisplay="auto"
-            step={1}
-            marks
-            min={0}
-            max={100}
-            />         
-            {/* <Slider value={editingTask?.aiPriority || 50} onChange={handleEditPriorityChange} valueLabelDisplay="auto" step={1} marks min={1} max={100} /> */}
-        </DialogContent>
+          <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Typography variant="caption" display="block">
+              ユーザー優先度
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+              <IconButton color="error" onClick={() => handleUserPriorityAdjustment(-10)} size="large">
+                <ThumbDownIcon />
+              </IconButton>
+              
+              <Typography variant="h5" component="div" sx={{ minWidth: 60, textAlign: 'center' }}>
+                {editingTask?.userPriority ?? 50}
+              </Typography>
+
+              <IconButton color="primary" onClick={() => handleUserPriorityAdjustment(10)} size="large">
+                <ThumbUpIcon />
+              </IconButton>
+            </Box>
+          </Box>
+          </DialogContent>
         <DialogActions>
             <Button onClick={handleCloseEditModal}>キャンセル</Button>
             <Button 
@@ -550,8 +621,144 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             </Button>
         </DialogActions>      
         </Dialog>
+
+        <Dialog open={openHistoryModal} onClose={() => setOpenHistoryModal(false)} fullWidth scroll="paper">
+        <DialogTitle>完了したタスクの履歴</DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'grid', gap: 1, mt: 1 }}>
+            {tasks
+              .filter(t => t.status === 'done') // 完了タスクのみフィルタリング
+              .map((t) => (
+                <Card key={t.id} sx={{ opacity: 0.8 }}>
+                  <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}> {/* Paddingを調整 */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography sx={{ textDecoration: 'line-through' }}>
+                        {t.task}
+                      </Typography>
+                      <Box>
+                        <Button size="small" onClick={() => handleToggleTaskStatus(t.id)}>
+                          戻す
+                        </Button>
+                        <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small">
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+            ))}
+            {tasks.filter(t => t.status === 'done').length === 0 && (
+              <Typography color="text.secondary" sx={{ textAlign: 'center', my: 4 }}>
+                完了したタスクはありません
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenHistoryModal(false)}>閉じる</Button>
+        </DialogActions>
+      </Dialog>
       </Box>
+  )};
+
+  const ChatPanel = () => {
+    return (
+    <Box
+      flexDirection="column"
+      sx={{
+        display: 'flex',
+        margin: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+        // width: '100vw'
+      }}
+    >
+      <Typography variant="h6" sx={{ mt: 2, mb: 2 }}>
+        Chat Panel
+      </Typography>
+
+      <Divider />
+
+      <TextField
+        value={inputTask}
+        onChange={e => setInputTask(e.target.value)}
+        placeholder="タスクを手入力"
+        variant="outlined"
+        size="small"
+        fullWidth
+      />
+
+      <Divider />
+
+      <Button onClick={(e) => {
+          e.stopPropagation(); // click することでこの panel に focus が来てしまうのを防ぐ
+          setFocusArea('list');
+        }
+      } variant="contained" sx={{ mt: 2 }}>Test</Button>
+    </Box>
+  )};
+
+
+  return (
+    <Box
+      position="relative"
+      width="100%"
+      height="100dvh"
+      overflow="hidden"
+    >
+      {/* List Window */}
+      <Paper
+        tabIndex={0}
+        onFocus={() => setFocusArea('list')}
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: isMobile ? '100%' : '50%',
+          height: '100%',
+          transform: isMobile
+            ? focusArea === 'list'
+              ? 'translateX(0%)'
+              : 'translateX(-10%)'
+            : 'none',
+          transition: 'transform 0.3s ease',
+          // zIndex: focusArea === 'list' ? 1 : 2,
+        }}
+      >
+        {/* List content */}
+        <TodoList />
+      </Paper>
+
+      {/* Chat Window */}
+      <Paper
+        {...swipeHandlers}
+        tabIndex={0}
+        onFocus={() => setFocusArea('chat')}
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: isMobile ? '90%' : '50%',
+          height: '100%',
+          transform: isMobile
+            ? focusArea === 'chat'
+              ? 'translateX(10%)'
+              : 'translateX(110%)'
+            : 'translateX(100%)',
+          transition: 'transform 0.3s ease',
+          // zIndex: focusArea === 'chat' ? 2 : 1,
+        }}
+      >
+        {/* Chat content */}
+        <ChatInterface 
+          tasks={tasks} 
+          onTaskCreated={handleTaskCreated} 
+          onTaskUpdated={handleTaskUpdated} // ← Step3で作成
+        />      </Paper>
+    </Box>
   );
+
+  
 };
 
 export default App;

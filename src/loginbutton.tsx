@@ -1,7 +1,8 @@
 import React from 'react';
 import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
-import { Box, Button, Typography, GoogleIcon } from './import-mui';
+import { Box, Button, Typography } from '@mui/material';
+import { GoogleIcon } from './import-mui';
 import { styled } from '@mui/material/styles';
 
 const StyledButton = styled(Button)(({ theme }) => ({
