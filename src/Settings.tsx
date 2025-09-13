@@ -1,16 +1,23 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@mui/material/styles';
-import { Alert, Avatar, Box, Button, Card, CardHeader, CardContent, CircularProgress, Divider, IconButton, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, Card, CardHeader, CardContent, CircularProgress, Divider, IconButton, Stack, TextField, Typography, Switch } from '@mui/material'; // Switchをインポート
 import { ArrowBackIcon, LogoutIcon, SaveIcon } from './import-mui';
 import { UserContext } from "./Usercontext";
 import { loadSystemPrompt, saveSystemPrompt } from './Promptsetting';
+import { ThemeContext } from './ThemeContext'; // ThemeContextをインポート
 
 const NotePage: React.FC = () => {
-  const [note, setNote] = useState('');
   const navigate = useNavigate();
   const theme = useTheme();
   const { user, authChecked, signOut } = useContext(UserContext);
+  const themeContext = useContext(ThemeContext); // ThemeContextを利用
+
+  // ThemeContextが提供されていない場合のガード
+  if (!themeContext) {
+    return null;
+  }
+  const { mode, setMode } = themeContext;
 
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(true);
@@ -40,23 +47,21 @@ const NotePage: React.FC = () => {
       setSaving(false);
     }
   };
-
-  if (loading) {
-    return <CircularProgress />;
-  }
-
-
-  // const handleSave = () => {
-  //   // 保存処理（例: API 呼び出し）
-  //   // console.log('保存された内容:', note);
-  //   alert('Configuration saved.');
-  // };
+  
+  // テーマ切り替えハンドラー
+  const handleThemeToggle = () => {
+    setMode(mode === 'light' ? 'dark' : 'light');
+  };
 
   const handleLogout = async () => {
     await signOut();
     console.log('Signed out.');
     navigate('/')
   };
+
+  if (loading) {
+    return <CircularProgress />;
+  }
 
   return (
     <Box sx={{ maxWidth: 600, mx: 'auto', mt: 2, px: 2 }}>
@@ -71,6 +76,7 @@ const NotePage: React.FC = () => {
 
       <Divider sx={{ mt: 2, mb: 2}} />
 
+      {/* AIペルソナ設定 */}
       <Typography variant="h5" gutterBottom>
         AIのペルソナ設定
       </Typography>
@@ -112,7 +118,21 @@ const NotePage: React.FC = () => {
       <Stack spacing={3}>
 
         <Divider />
+        
+        {/* テーマカラー切り替え部分 */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h5">
+            テーマカラー
+          </Typography>
+          <Switch 
+            checked={mode === 'dark'}
+            onChange={handleThemeToggle}
+          />
+        </Box>
 
+        <Divider />
+
+        {/* アカウント情報 */}
         <Typography variant="h5" gutterBottom>
           使用中のアカウント
         </Typography>
@@ -124,11 +144,6 @@ const NotePage: React.FC = () => {
             title={user.displayName ?? "名前未設定"}
             subheader={user.email}
           />
-          {/* <CardContent>
-            <Typography variant="body2" color="text.secondary">
-              UID: {user.uid}
-            </Typography>
-          </CardContent> */}
         </Card>
         )}
 

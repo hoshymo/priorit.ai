@@ -67,7 +67,14 @@ const App: React.FC = () => {
   const { enqueueSnackbar } = useSnackbar(); // ★ Snackbar用のhookを呼び出し
   const [suggestionFetched, setSuggestionFetched] = useState(false); // ★ サジェストの多重実行を防ぐフラグ
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const [suggestionComment, setSuggestionComment] = useState<string | null>(null); // ← 新しく追加
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false);
 
+  const pulseGlow = keyframes`
+  0% { box-shadow: 0 0 5px 2px rgba(25, 118, 210, 0.4); }
+  50% { box-shadow: 0 0 15px 5px rgba(25, 118, 210, 0.8); }
+  100% { box-shadow: 0 0 5px 2px rgba(25, 118, 210, 0.4); }
+`;
  // --- ▼▼▼ このuseEffectを修正または追加 ▼▼▼ ---
   useEffect(() => {
     // ユーザーがいて、まだサジェスト機能が実行されていない場合
@@ -98,8 +105,9 @@ const App: React.FC = () => {
             
             // AIからのコメントがあれば通知として表示
             if (suggestion.comment) {
-              enqueueSnackbar(suggestion.comment, { variant: 'info' });
+              setSuggestionComment(suggestion.comment);
               setHighlightedTaskId(suggestion.suggestedTaskId);
+              setShowSuggestionModal(true);
               // (発展) サジェストされたタスクをハイライトするなどの演出も可能
             }
           } catch (error) {
@@ -113,7 +121,7 @@ const App: React.FC = () => {
       setTasks([]);
       setSuggestionFetched(false); 
     }
-  }, [user, suggestionFetched, enqueueSnackbar]);
+  }, [user, suggestionFetched]);
 
   // --- タスク追加時のaiPriorityをデフォルト値(50)に設定 ---
   const handleAddTaskManual = async () => {
@@ -334,6 +342,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     setMode((mode === 'light' ? 'dark' : 'light'));
   };
 
+  const GlowingCard = styled(Card)(({ theme }) => ({
+  animation: `${pulseGlow} 1.5s 4`,
+  }));
+
   if (!authChecked) return (
       <Box
         sx={{
@@ -360,6 +372,24 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         width: '100%'
       }}
     >
+
+      <Dialog open={showSuggestionModal} onClose={() => setShowSuggestionModal(false)}>
+        <DialogTitle>今日はこのタスクを先に進めると、一番効果的かも！</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1">
+            {suggestionComment}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          {/* ハイライトボタン（任意） */}
+          <Button onClick={() => {
+            setShowSuggestionModal(false);
+            setHighlightedTaskId(null); // ハイライトを解除
+          }} color="secondary">
+            閉じる
+          </Button>
+        </DialogActions>
+      </Dialog>
         <Box sx={{ width: '96%', display: 'grid', gap:1, mt: 2 }}>
 
             {(() => {
@@ -425,7 +455,8 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                 <>
                 {/* --- TOP3タスクの表示 --- */}
                 {topTasks.map((t) => {
-                    const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : Card;
+                    const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : 
+                    t.id === highlightedTaskId ? GlowingCard : Card;
                     return (
                     <CardWrapper style={{marginBottom: 0.5}} key={t.id}>
                         <CardContent>
@@ -560,13 +591,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
 
       {/* --- 右下固定ボタン --- */}
       <Box sx={{ position: 'fixed', bottom: 20, left: 20, zIndex: 1000 }}>
-        <Switch checked={mode === 'dark'} onChange={handleToggleDark} />
-      </Box>
-      <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
-              {/* --- ▼▼▼ 履歴ボタンを追加 ▼▼▼ --- */}
+        {/* <Switch checked={mode === 'dark'} onChange={handleToggleDark} /> */}
         <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
           <HistoryIcon />
         </IconButton>
+      </Box>
+      <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
+              {/* --- ▼▼▼ 履歴ボタンを追加 ▼▼▼ --- */}
+
         <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
           <SettingsIcon />
         </IconButton>
