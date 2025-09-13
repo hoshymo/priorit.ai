@@ -75,7 +75,6 @@ const App: React.FC = () => {
   50% { box-shadow: 0 0 15px 5px rgba(25, 118, 210, 0.8); }
   100% { box-shadow: 0 0 5px 2px rgba(25, 118, 210, 0.4); }
 `;
- // --- ▼▼▼ このuseEffectを修正または追加 ▼▼▼ ---
   useEffect(() => {
     // ユーザーがいて、まだサジェスト機能が実行されていない場合
     if (user && !suggestionFetched) {
@@ -149,7 +148,6 @@ const App: React.FC = () => {
     await saveTasks(user.uid, newTasks);
   };
 
-  // --- ▼▼▼ 更新用の関数を追加 ▼▼▼ ---
   const handleTaskUpdated = async (updatedTaskData: Partial<Task> & { id: string }) => {
     if (!user) return;
     const newTasks = tasks.map(task => {
@@ -450,13 +448,9 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
               borderImage: 'linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet) 1',
               borderRadius: '12px',
             });
-
-            return (
-                <>
-                {/* --- TOP3タスクの表示 --- */}
-                {topTasks.map((t) => {
+            const TaskCard = (t: Task) => {
                     const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : 
-                    t.id === highlightedTaskId ? GlowingCard : Card;
+                      t.id === highlightedTaskId ? GlowingCard : Card;
                     return (
                     <CardWrapper key={t.id}>
                         <CardContent>
@@ -505,62 +499,20 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                             </Box>
                         </Box>
                   </CardWrapper>
-                );})}
+                  );
+            }
+
+            return (
+                <>
+                {/* --- TOP3タスクの表示 --- */}
+                {topTasks.map((t) => TaskCard(t))}
 
                 {/* --- 4件目以降のタスクをCollapseで囲む --- */}
                 {remainingTasks.length > 0 && (
                     <>
                     <Collapse in={isExpanded} timeout="auto" unmountOnExit>
                         <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
-                        {remainingTasks.map((t) => (
-                            <Card style={{marginBottom: 0.5}} key={t.id}>
-                                <CardContent>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                    <Typography variant="h6" component="div">
-                                        {t.task}
-                                        {/* 理由表示用ツールチップ */}
-                                        {t.reason && (
-                                          <Tooltip title={t.reason}>
-                                            <IconButton size="small">
-                                              <InfoIcon fontSize="small" />
-                                            </IconButton>
-                                          </Tooltip>
-                                        )}
-                                    </Typography>
-                                    <Box>
-                                      <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small"><CheckIcon /></IconButton>
-                                      <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                                      <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
-                                    </Box>
-
-                                    </Box>
-                                  
-                                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                                    AI優先度: {t.aiPriority}
-                                    
-                                    {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
-                                    {t.userPriority != null && (
-                                        <Box component="span" sx={{ 
-                                        color: '#1976d2', // MUIのデフォルトの青色
-                                        fontWeight: 'bold',
-                                        ml: 1 // marginLeft
-                                        }}>
-                                        ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
-                                        </Box>
-                                    )}
-                                    </Typography>       
-
-                                    <Box>
-                                      <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
-                                        <ThumbDownIcon fontSize="small" />
-                                      </IconButton>
-                                      <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, 10)}>
-                                        <ThumbUpIcon fontSize="small" />
-                                      </IconButton>
-                                    </Box>         
-                                </CardContent>
-                            </Card>
-                        ))}
+                        {remainingTasks.map((t) => TaskCard(t))}
                         </Box>
                     </Collapse>
                     
@@ -787,7 +739,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         }}
       >
         {/* Chat content */}
-        {/* --- ▼▼▼ tasksをpropとして渡す ▼▼▼ --- */}
         <ChatInterface 
           tasks={tasks} 
           onTaskCreated={handleTaskCreated} 
