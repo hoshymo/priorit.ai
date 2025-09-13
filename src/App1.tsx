@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
-import { useSwipeable, preventDefaultTouchmoveEvent, SwipeableOptions } from 'react-swipeable';
+import { useSwipeable } from 'react-swipeable';
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
