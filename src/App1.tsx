@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
+import { useSwipeable, preventDefaultTouchmoveEvent, SwipeableOptions } from 'react-swipeable';
 import { UserContext } from "./Usercontext";
 import { saveTasks, loadTasks } from "./task";
 import { LoginButton } from "./loginbutton";
@@ -343,6 +344,15 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
   const GlowingCard = styled(Card)(({ theme }) => ({
   animation: `${pulseGlow} 1.5s 4`,
   }));
+
+  const swipeHandlers = useSwipeable({
+      onSwiped: (eventData) => {
+        // console.log("User Swiped!", eventData.dir);
+        if (eventData.dir === 'Right')
+          setFocusArea(focusArea == 'chat' ? 'list' : 'chat');
+      }
+  });
+
 
   if (!authChecked) return (
       <Box
@@ -721,6 +731,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
 
       {/* Chat Window */}
       <Paper
+        {...swipeHandlers}
         tabIndex={0}
         onFocus={() => setFocusArea('chat')}
         sx={{
