@@ -55,7 +55,7 @@ const ChatInterface: React.FC<{
     setLoading(true);
     
     try {
-      // --- ▼▼▼ FirestoreからsystemPromptを取得する処理を追加 ▼▼▼ ---
+      // FirestoreからsystemPromptを取得する処理
       const db = getFirestore();
       const userSettingsRef = doc(db, 'userSettings', user.uid);
       const docSnap = await getDoc(userSettingsRef);
@@ -63,11 +63,7 @@ const ChatInterface: React.FC<{
       let systemPrompt: string | null = null;
       if (docSnap.exists() && docSnap.data().systemPrompt) {
         systemPrompt = docSnap.data().systemPrompt;
-        console.log("System prompt loaded from Firestore on client-side.");
-      } else {
-        console.log("System prompt not found on Firestore. Backend will use its default.");
       }
-      // --- ▲▲▲ ここまで追加 ▲▲▲ ---
 
       const recentMessages = messages.slice(-5).map(m => 
         `${m.sender === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`
