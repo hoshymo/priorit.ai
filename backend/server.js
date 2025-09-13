@@ -160,70 +160,6 @@ ${JSON.stringify(tasks, null, 2)}
 });
 
 // 新しいエンドポイント: チャットメッセージ処理
-// app.post('/api/chat', async (req, res) => {
-//   // 認証チェック（既存コードと同様）
-//   const idToken = req.headers.authorization?.split('Bearer ')[1];
-//   if (!idToken) {
-//     console.log("Request without ID token");
-//     return res.status(401).json({ error: 'Unauthorized' });
-//   }
-//   if (!passIdTokenVerify) {
-//     // Verify Firebase auth token
-//     var uid = null;
-//     await admin.auth().verifyIdToken(idToken)
-//       .then((decodedToken) => {
-//         uid = decodedToken.uid;
-//         console.log("Request by: ", decodedToken.user_id);
-//       })
-//       .catch((error) => {
-//         console.error("Error verifying ID token:", error);
-//       });
-//     if (!uid) {
-//       return res.status(401).json({ error: 'Unauthorized' });
-//     }
-//   }
-  
-//   try {
-//     const { message, context } = req.body;
-    
-//     // Gemini APIへのプロンプト構築
-//     const prompt = `
-// あなたはタスク管理AIアシスタントです。ユーザーの入力からタスク情報を抽出し、会話形式でタスクの詳細を整理します。
-
-// # 指示
-// 1. ユーザーの入力からタスク情報を抽出してください
-// 2. 不足している情報があれば質問してください
-// 3. 必要な情報が揃ったら、最終的なタスク情報をJSON形式で提供してください
-
-// # 抽出すべき情報
-// - タスクのタイトル（必須）
-// - 期限：明示されていれば抽出、なければ質問
-// - 優先度（high/medium/low）：明示されていれば抽出、なければ推測して質問
-// - タグ：「#」で始まる単語があれば抽出
-
-// # レスポンス形式
-// 必ず以下のJSON形式で返してください:
-// {
-//   "message": "ユーザーへの返答メッセージ",
-//   "extractedTask": {
-//     "title": "タスクのタイトル",
-//     "dueDate": "期限（ISO形式または相対表現）",
-//     "priority": "high/medium/low",
-//     "reason": "優先度の理由（短文）",
-//     "tags": ["タグ1", "タグ2"]
-//   },
-//   "complete": false,  // タスク情報が完全に揃っていればtrue
-//   "nextQuestion": "deadline/priority/confirmation", // 次に聞くべき情報
-//   "options": ["選択肢1", "選択肢2"] // 質問の選択肢（あれば）
-// }
-
-// ${context ? "これまでの会話：\n" + context : ""}
-
-// ユーザー: ${message}
-//     `;
-
-
-// 新しいエンドポイント: チャットメッセージ処理
 app.post('/api/chat', async (req, res) => {
   // 認証チェック（既存コードと同様）
   const idToken = req.headers.authorization?.split('Bearer ')[1];
@@ -252,12 +188,6 @@ app.post('/api/chat', async (req, res) => {
     const baseInstruction = 
       systemPrompt || 
       "あなたはタスク管理AIアシスタントです。ユーザーの入力からタスク情報を抽出し、会話形式でタスクの詳細を整理します。";
-
-    if (systemPrompt) {
-      console.log("クライアントから送信されたカスタム指示を使用します。");
-    } else {
-      console.log("デフォルトの指示を使用します。");
-    }
 
     // Gemini APIへのプロンプト構築
     // ${baseInstruction} を使用してプロンプトの先頭部分を動的にする

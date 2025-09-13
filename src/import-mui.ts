@@ -3,6 +3,7 @@
 
 // #region import icons
 export { default as ArrowBackIcon } from '@mui/icons-material/ArrowBack';
+export { default as ChatIcon } from '@mui/icons-material/Chat';
 export { default as CheckIcon } from '@mui/icons-material/CheckCircle';
 export { default as DeleteIcon } from '@mui/icons-material/Delete';
 export { default as LogoutIcon } from '@mui/icons-material/Logout';

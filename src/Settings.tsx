@@ -76,15 +76,14 @@ const NotePage: React.FC = () => {
 
       <Divider sx={{ mt: 2, mb: 2}} />
 
-      {/* AIペルソナ設定 */}
-      <Typography variant="h5" gutterBottom>
-        AIのペルソナ設定
+      <Typography variant="h6" gutterBottom>
+        System prompt
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         AIにどのような役割を担ってほしいか、自由に指示を書いてください。
       </Typography>
       <TextField
-        label="システムプロンプト"
+        label="System prompt"
         multiline
         rows={6}
         fullWidth
@@ -118,11 +117,10 @@ const NotePage: React.FC = () => {
       <Stack spacing={3}>
 
         <Divider />
-        
-        {/* テーマカラー切り替え部分 */}
+
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography variant="h5">
-            テーマカラー
+          <Typography variant="h6">
+            Dark theme
           </Typography>
           <Switch 
             checked={mode === 'dark'}
@@ -133,7 +131,7 @@ const NotePage: React.FC = () => {
         <Divider />
 
         {/* アカウント情報 */}
-        <Typography variant="h5" gutterBottom>
+        <Typography variant="h6" gutterBottom>
           使用中のアカウント
         </Typography>
 

@@ -7,7 +7,7 @@ import { LoginButton } from "./loginbutton";
 import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
 import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Slide, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
-import { CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, MicIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
+import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
 import ChatInterface from "./components/ChatInterface";
@@ -390,7 +390,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           </Button>
         </DialogActions>
       </Dialog>
-        <Box sx={{ width: '96%', display: 'grid', gap:1, mt: 2 }}>
+        <Box sx={{ width: '96%', display: 'grid', gap:1 }}>
 
             {(() => {
             // 事前にソート済みのタスク配列を準備
@@ -415,7 +415,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
               position: 'relative',
               zIndex: 0,
               borderRadius: theme.shape.borderRadius,
-              padding: theme.spacing(2),
+              padding: theme.spacing(1),
               overflow: 'hidden',
               // 枠の背景を回転させる擬似要素
               '&::before': {
@@ -426,7 +426,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                 right: '-819px',
                 bottom: '-819px',
                 borderRadius: 'inherit',
-                padding: '4px',
+                // padding: '4px',
                 background: 'conic-gradient(red, orange, indigo, violet, red)',
                 // background: 'conic-gradient(red, orange, yellow, green, blue, indigo, violet, red)',
                 animation: `${rainbowSpin} 12s linear infinite`,
@@ -458,11 +458,27 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                     const CardWrapper = (t.aiPriority + (t.userPriority ?? 0)) > 80 ? AnimatedCard : 
                     t.id === highlightedTaskId ? GlowingCard : Card;
                     return (
-                    <CardWrapper style={{marginBottom: 0.5}} key={t.id}>
+                    <CardWrapper key={t.id}>
                         <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Typography variant="h6" component="div">
                                 {t.task}
+                            </Typography>
+                            </Box>
+
+                        </CardContent>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1 }}>
+                            <Box>
+                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
+                                <ThumbDownIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, 10)}>
+                                <ThumbUpIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                              優先度: {t.aiPriority}
                                 {/* 理由表示用ツールチップ */}
                                 {t.reason && (
                                   <Tooltip title={t.reason}>
@@ -471,20 +487,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                     </IconButton>
                                   </Tooltip>
                                 )}
-                            </Typography>
-                            <Box>
-                              {/* --- ▼▼▼ 完了ボタンを追加 ▼▼▼ --- */}
-                              <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small">
-                                <CheckIcon />
-                              </IconButton>
-                              <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                              <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
-                            </Box>
-                            </Box>
-                            
-                            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                            AI優先度: {t.aiPriority}
-                            
                             {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
                             {t.userPriority != null && (
                                 <Box component="span" sx={{ 
@@ -496,16 +498,12 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                 </Box>
                             )}
                             </Typography>
-
                             <Box>
-                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
-                                <ThumbDownIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, 10)}>
-                                <ThumbUpIcon fontSize="small" />
-                              </IconButton>
+                              <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small"><CheckIcon /></IconButton>
+                              <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
+                              <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
                             </Box>
-                        </CardContent>
+                        </Box>
                   </CardWrapper>
                 );})}
 
@@ -530,10 +528,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                         )}
                                     </Typography>
                                     <Box>
-                                      {/* --- ▼▼▼ 完了ボタンを追加 ▼▼▼ --- */}
-                                      <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small">
-                                        <CheckIcon />
-                                      </IconButton>
+                                      <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small"><CheckIcon /></IconButton>
                                       <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
                                       <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
                                     </Box>
@@ -590,22 +585,17 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         </Box>
 
       {/* --- 右下固定ボタン --- */}
-      <Box sx={{ position: 'fixed', bottom: 20, left: 20, zIndex: 1000 }}>
-        {/* <Switch checked={mode === 'dark'} onChange={handleToggleDark} /> */}
-        <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <HistoryIcon />
-        </IconButton>
-      </Box>
       <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
-              {/* --- ▼▼▼ 履歴ボタンを追加 ▼▼▼ --- */}
-
         <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
           <SettingsIcon />
+        </IconButton>
+        <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <HistoryIcon />
         </IconButton>
       {/* --- 音声入力開始ボタン --- チャットモードでは非表示 */}
       {!showChat && (
         <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <MicIcon fontSize="large" />
+          <ChatIcon fontSize="large" />
         </IconButton>
       )}
       </Box>
@@ -751,7 +741,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     <Box
       position="relative"
       width="100%"
-      height="100vh"
+      height="100dvh"
       overflow="hidden"
     >
       {/* List Window */}
