@@ -1,9 +1,10 @@
 import { db } from "./firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 
+export const DEFAULT_USERPRIORITY = 0;
+
 // タスク保存
 export async function saveTasks(userId: string, tasks: any[]) {
-  // ▼▼▼【ここから修正】▼▼▼
   // Firestoreに保存する前に、undefinedの値をnullに変換する
   const tasksToSave = tasks.map(task => {
     // 元のtaskオブジェクトを変更しないようにコピーを作成
@@ -20,7 +21,6 @@ export async function saveTasks(userId: string, tasks: any[]) {
 
     return newTask;
   });
-  // ▲▲▲【ここまで修正】▲▲▲
 
   try {
     // 変換後のデータを { list: ... } の形式で保存

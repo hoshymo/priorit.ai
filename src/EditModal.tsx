@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Typography, Box, IconButton, Button } from '@mui/material';
 import { ThumbUpIcon, ThumbDownIcon } from './import-mui'; // import-muiからインポート
+import { DEFAULT_USERPRIORITY } from "./task";
 
 // Propsの型を定義
 interface EditModalProps {
@@ -25,9 +26,8 @@ const EditModal: React.FC<EditModalProps> = ({ open, task, onClose, onUpdate }) 
   };
 
   const handleUserPriorityAdjustment = (adjustment: number) => {
-    const currentPriority = editingTask.userPriority ?? 50;
-    const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
-    setEditingTask({ ...editingTask, userPriority: newPriority });
+    const currentPriority = editingTask.userPriority ?? DEFAULT_USERPRIORITY;
+    setEditingTask({ ...editingTask, userPriority: currentPriority + adjustment });
   };
 
   const handleSave = () => {
@@ -59,7 +59,7 @@ const EditModal: React.FC<EditModalProps> = ({ open, task, onClose, onUpdate }) 
               <ThumbDownIcon />
             </IconButton>
             <Typography variant="h5" component="div" sx={{ minWidth: 60, textAlign: 'center' }}>
-              {editingTask?.userPriority ?? 50}
+              {editingTask?.userPriority ?? DEFAULT_USERPRIORITY}
             </Typography>
             <IconButton color="primary" onClick={() => handleUserPriorityAdjustment(10)} size="large">
               <ThumbUpIcon />

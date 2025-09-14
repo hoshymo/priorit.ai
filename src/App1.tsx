@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
 import { useSwipeable } from 'react-swipeable';
 import { UserContext } from "./Usercontext";
-import { saveTasks, loadTasks } from "./task";
+import { saveTasks, loadTasks, DEFAULT_USERPRIORITY } from "./task";
 import { LoginButton } from "./loginbutton";
 import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
@@ -26,7 +26,7 @@ const fixTaskArray = (arr: any[]): Task[] =>
   arr.map((t: any, index: number) => ({
     id: t.id || `${Date.now()}-${index}`,
     task: t.task,
-    aiPriority: t.priority || t.aiPriority || 50, // ← 互換性のための修正
+    aiPriority: t.priority || t.aiPriority || DEFAULT_USERPRIORITY, // ← 互換性のための修正
     userPriority: t.userPriority, // ← userPriorityを読み込む
     priority: t.priority || 'medium', // 優先度（high/medium/low）
     status: t.status || 'todo', // ステータス（todo/done）
@@ -124,7 +124,7 @@ const App: React.FC = () => {
     }
   }, [user, suggestionFetched]);
 
-  // --- タスク追加時のaiPriorityをデフォルト値(50)に設定 ---
+  // --- タスク追加時のaiPriorityをデフォルト値に設定 ---
   const handleAddTaskManual = async () => {
     if (!user || !inputTask.trim()) return;
     const newTask = { 
@@ -206,17 +206,19 @@ const App: React.FC = () => {
     setEditingTask(null);
   };
 
-  const handleUpdateTask = async () => {
-    if (!user || !editingTask) return;
-    const newTasks = tasks.map(task => 
-      task.id === editingTask.id ? editingTask : task
-    );
+const handleUpdateTask = async (updatedTaskData: { id: string; task: string; userPriority?: number }) => {
+    if (!user) return;
+    const newTasks = tasks.map(task => {
+      if (task.id === updatedTaskData.id) {
+        // スプレッド構文で既存のタスク情報に更新情報をマージ
+        return { ...task, ...updatedTaskData };
+      }
+      return task;
+    });
     setTasks(newTasks);
     await saveTasks(user.uid, newTasks);
     handleCloseEditModal();
   };
-
-  
 
   const handleToggleTaskStatus = async (taskId: string) => {
     if (!user) return;
@@ -243,15 +245,12 @@ const App: React.FC = () => {
 
   const handleUserPriorityAdjustment = (adjustment: number) => {
     if (!editingTask) return;
-    
-    // 現在の優先度を取得。未設定(null or undefined)の場合はデフォルト値の50を基準にする
-    const currentPriority = editingTask.userPriority ?? 50;
-    
-    // 優先度を調整し、0〜100の範囲に収める
-    const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
-    
+
+    // 現在の優先度を取得。未設定(null or undefined)の場合はデフォルト値を基準にする
+    const currentPriority = editingTask.userPriority ?? DEFAULT_USERPRIORITY;
+
     // stateを更新
-    setEditingTask({ ...editingTask, userPriority: newPriority });
+    setEditingTask({ ...editingTask, userPriority: currentPriority + adjustment });
   };
   
 const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
@@ -260,7 +259,7 @@ const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
     const newTasks = tasks.map(task => {
       // IDが一致するタスクを見つけたら、優先度を更新
       if (task.id === taskId) {
-        const currentPriority = task.userPriority ?? 50; // 未設定の場合は50を基準
+        const currentPriority = task.userPriority ?? DEFAULT_USERPRIORITY;
         const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
         return { ...task, userPriority: newPriority };
       }
@@ -408,8 +407,8 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             const sortedTasks = todoTasks
                 .slice()
                 .sort((a, b) => {
-                const userPriorityA = a.userPriority || 50; // 未設定は中間値として扱う
-                const userPriorityB = b.userPriority || 50;
+                const userPriorityA = a.userPriority || DEFAULT_USERPRIORITY;
+                const userPriorityB = b.userPriority || DEFAULT_USERPRIORITY;
                 const totalPriorityA = userPriorityA + a.aiPriority;
                 const totalPriorityB = userPriorityB + b.aiPriority;
                 return totalPriorityB - totalPriorityA;
@@ -494,14 +493,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                     </IconButton>
                                   </Tooltip>
                                 )}
-                            {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
+                            {/* ユーザー優先度が設定されていれば、±値を青字で表示 */}
                             {t.userPriority != null && (
                                 <Box component="span" sx={{ 
                                 color: '#1976d2', // MUIのデフォルトの青色
                                 fontWeight: 'bold',
                                 ml: 1 // marginLeft
                                 }}>
-                                ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
+                                ( {t.userPriority >= 0 ? '+' : ''}{t.userPriority} )
                                 </Box>
                             )}
                             </Typography>
@@ -583,42 +582,6 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           </>
         )}
       </Dialog>
-
-      {/* --- 編集モーダル ---
-      <Dialog open={openEditModal} onClose={handleCloseEditModal} fullWidth>
-        <DialogTitle>タスクの編集</DialogTitle>
-        <DialogContent>
-          <TextField autoFocus margin="dense" label="タスク内容" type="text" fullWidth variant="standard" value={editingTask?.task || ""} onChange={handleEditInputChange} sx={{ mb: 4 }} />
-          <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Typography variant="caption" display="block">
-              ユーザー優先度
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
-              <IconButton color="error" onClick={() => handleUserPriorityAdjustment(-10)} size="large">
-                <ThumbDownIcon />
-              </IconButton>
-              
-              <Typography variant="h5" component="div" sx={{ minWidth: 60, textAlign: 'center' }}>
-                {editingTask?.userPriority ?? 50}
-              </Typography>
-
-              <IconButton color="primary" onClick={() => handleUserPriorityAdjustment(10)} size="large">
-                <ThumbUpIcon />
-              </IconButton>
-            </Box>
-          </Box>
-          </DialogContent>
-        <DialogActions>
-            <Button onClick={handleCloseEditModal}>キャンセル</Button>
-            <Button 
-            onClick={handleUpdateTask} 
-            color="primary"
-            variant="contained"
-            >
-            保存する
-            </Button>
-        </DialogActions>      
-        </Dialog> */}
 
           <Box>
             {/* 既存の編集モーダルは削除し、以下のコンポーネントに置き換える */}
