@@ -375,8 +375,8 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     <Box sx={{
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center',
-        height: '100%',
+        // alignItems: 'center',
+        maxHeight: '100%',
         width: '100%'
       }}
     >
@@ -524,43 +524,38 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                         <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
                         {remainingTasks.map((t) => TaskCard(t))}
                         </Box>
+
+                        {/* --- 開閉ボタン --- */}
+                        <Button 
+                            onClick={() => setIsExpanded(!isExpanded)} 
+                            fullWidth 
+                            sx={{ mt: 1, mb: 10 }}
+                        >
+                            閉じる
+                        </Button>
                     </Collapse>
                     
                     {/* --- 開閉ボタン --- */}
+                    {!isExpanded && (
                     <Button 
                         onClick={() => setIsExpanded(!isExpanded)} 
                         fullWidth 
                         sx={{ mt: 1 }}
                     >
-                        {isExpanded ? '閉じる' : `残り${remainingTasks.length}件を見る`}
+                        残り {remainingTasks.length}件を見る
                     </Button>
+                    )}
                     </>
                 )}
                 </>
             );
             })()}
 
-          <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
+          {/* <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
             {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
-          </Button>
+          </Button> */}
 
         </Box>
-
-      {/* --- 右下固定ボタン --- */}
-      <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
-        <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <SettingsIcon />
-        </IconButton>
-        <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <HistoryIcon />
-        </IconButton>
-      {/* --- 音声入力開始ボタン --- チャットモードでは非表示 */}
-      {!showChat && (
-        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <ChatIcon fontSize="large" />
-        </IconButton>
-      )}
-      </Box>
 
       {/* --- 音声入力モーダル --- */}
       <Dialog open={openMicModal} onClose={handleCloseMicModal} fullWidth>
@@ -715,7 +710,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           top: 0,
           left: 0,
           width: isMobile ? '100%' : '50%',
-          height: '100%',
+          height: '100dvh',
+          overflow: 'auto',
+          pt: 1,
+          pb: 1,
           transform: isMobile
             ? focusArea === 'list'
               ? 'translateX(0%)'
@@ -729,6 +727,24 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         <TodoList />
       </Paper>
 
+      {/* --- 右下固定ボタン --- */}
+      {focusArea === 'list' && (
+      <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
+        <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <SettingsIcon />
+        </IconButton>
+        <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <HistoryIcon />
+        </IconButton>
+      {/* --- 音声入力開始ボタン --- チャットモードでは非表示 */}
+      {!showChat && (
+        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <ChatIcon fontSize="large" />
+        </IconButton>
+      )}
+      </Box>
+      )}
+
       {/* Chat Window */}
       <Paper
         {...swipeHandlers}
@@ -739,7 +755,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           top: 0,
           left: 0,
           width: isMobile ? '90%' : '50%',
-          height: '100%',
+          height: '100dvh',
           transform: isMobile
             ? focusArea === 'chat'
               ? 'translateX(10%)'
