@@ -13,6 +13,7 @@ import { getAuth } from "firebase/auth";
 import ChatInterface from "./components/ChatInterface";
 import { Task } from "./types";
 import { useSnackbar } from 'notistack';
+import EditModal from './EditModal'; 
 
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
@@ -215,6 +216,8 @@ const App: React.FC = () => {
     await saveTasks(user.uid, newTasks);
     handleCloseEditModal();
   };
+
+  
 
   const handleToggleTaskStatus = async (taskId: string) => {
     if (!user) return;
@@ -634,7 +637,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         )}
       </Dialog>
 
-      {/* --- 編集モーダル --- */}
+      {/* --- 編集モーダル ---
       <Dialog open={openEditModal} onClose={handleCloseEditModal} fullWidth>
         <DialogTitle>タスクの編集</DialogTitle>
         <DialogContent>
@@ -668,7 +671,19 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             保存する
             </Button>
         </DialogActions>      
-        </Dialog>
+        </Dialog> */}
+
+          <Box>
+            {/* 既存の編集モーダルは削除し、以下のコンポーネントに置き換える */}
+            {editingTask && (
+              <EditModal
+                open={openEditModal}
+                task={editingTask}
+                onClose={handleCloseEditModal}
+                onUpdate={handleUpdateTask}
+              />
+            )}
+          </Box>
 
         <Dialog open={openHistoryModal} onClose={() => setOpenHistoryModal(false)} fullWidth scroll="paper">
         <DialogTitle>完了したタスクの履歴</DialogTitle>
