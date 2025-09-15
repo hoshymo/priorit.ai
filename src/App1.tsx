@@ -8,7 +8,7 @@ import { LoginButton } from "./loginbutton";
 import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
 import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Slide, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
-import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
+import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, PlusIcon, ScheduleIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
 import { getAuth } from "firebase/auth";
 import ChatInterface from "./components/ChatInterface";
@@ -474,6 +474,9 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
 
                         </CardContent>
 
+                            {/* <Typography variant="body2" color="text.secondary" component="div">
+                                {t.dueDate}
+                            </Typography> */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1 }}>
                             <Box>
                               <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
@@ -484,7 +487,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                               </IconButton>
                             </Box>
                             <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                              優先度: {t.aiPriority}
+                              {/* ユーザー優先度が設定されていたら表示 */}
+                              <Tooltip title={t.userPriority}>
+                                <IconButton size="small" sx={{ color: t.userPriority ? 'pink' : 'gray' }}>
+                                  <ThumbUpIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                                {/* 優先度合計値。ちょっと冗長だが、number 型なのに string が入っていることがあるようで editor での警告表示除去対策もありこの表記に。 */}
+                                {(typeof t.aiPriority === 'string' ? parseInt(t.aiPriority) : t.aiPriority) + (t.userPriority ?? DEFAULT_USERPRIORITY)}
                                 {/* 理由表示用ツールチップ */}
                                 {t.reason && (
                                   <Tooltip title={t.reason}>
@@ -493,21 +503,20 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                     </IconButton>
                                   </Tooltip>
                                 )}
-                            {/* ユーザー優先度が設定されていれば、±値を青字で表示 */}
-                            {t.userPriority != null && (
-                                <Box component="span" sx={{ 
-                                color: '#1976d2', // MUIのデフォルトの青色
-                                fontWeight: 'bold',
-                                ml: 1 // marginLeft
-                                }}>
-                                ( {t.userPriority >= 0 ? '+' : ''}{t.userPriority} )
-                                </Box>
-                            )}
+                                {/* 期限表示用ツールチップ */}
+                                {t.dueDate && (
+                                  <Tooltip title={t.dueDate}>
+                                    <IconButton size="small">
+                                      <ScheduleIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                             </Typography>
                             <Box>
-                              <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small"><CheckIcon /></IconButton>
                               <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                              <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
+                              <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small"><CheckIcon /></IconButton>
+                              {/* いきなり削除はしなくていいかな。まずは done にすることにしよう */}
+                              {/* <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton> */}
                             </Box>
                         </Box>
                   </CardWrapper>

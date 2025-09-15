@@ -13,6 +13,8 @@ if (passIdTokenVerify) {
   console.log("Skipping ID token verification...");
 }
 
+const AIMODEL = process.env.AIMODEL ?? "gemini-2.5-flash-lite";
+
 const app = express();
 app.use(cors({
   origin: FE_DOMAIN,
@@ -52,7 +54,7 @@ app.post('/api/generate', async (req, res) => {
   try {
     const prompt = req.body.prompt;
     const result = await axios.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + process.env.REACT_APP_GEMINI_API_KEY,
+      `https://generativelanguage.googleapis.com/v1beta/models/${AIMODEL}:generateContent?key=` + process.env.REACT_APP_GEMINI_API_KEY,
       {
         contents: [
           {
@@ -136,7 +138,7 @@ ${JSON.stringify(tasks, null, 2)}
 
     // Gemini API呼び出し (既存のコードを参考)
     const result = await axios.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + process.env.REACT_APP_GEMINI_API_KEY,
+      `https://generativelanguage.googleapis.com/v1beta/models/${AIMODEL}:generateContent?key=` + process.env.REACT_APP_GEMINI_API_KEY,
       {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         safetySettings: [/* ... */]
@@ -180,23 +182,24 @@ app.post('/api/chat', async (req, res) => {
   }
   
   try {
-    // --- ▼▼▼ 修正点 1: systemPrompt を受け取る ▼▼▼ ---
     const { message, context, systemPrompt, existingTasks } = req.body;
-    
-    // --- ▼▼▼ 修正点 2: systemPrompt を動的に設定する ▼▼▼ ---
-    // systemPromptが存在すればそれを使用し、なければデフォルトの指示を設定
-    const baseInstruction = 
-      systemPrompt || 
-      "あなたはタスク管理AIアシスタントです。ユーザーの入力からタスク情報を抽出し、会話形式でタスクの詳細を整理します。";
+
+    const currentDatetime = new Date().toLocaleString("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      hourCycle: "h23"
+    }).replace(/\//g, '-').replace(',', '') + ' JST';
 
     // Gemini APIへのプロンプト構築
-    // ${baseInstruction} を使用してプロンプトの先頭部分を動的にする
 const prompt = `
-${baseInstruction}
+あなたはタスク管理AIアシスタントです。ユーザーの入力からタスク情報を抽出し、会話形式でタスクの詳細を整理します。
+現在日時: ${currentDatetime}
 
 # あなたの役割
 ユーザーとの対話を通じて、タスクの「新規作成」または「既存タスクの更新」を行ってください。
 ユーザーのメッセージの意図を正確に読み取り、適切なアクションを実行してください。
+あいまいな指定は適切にいい感じで変換してください。
+# ユーザー設定の system prompt
+${systemPrompt}
 
 # 指示
 1. ユーザーのメッセージが新しいタスクに関するものか、既存タスクの変更に関するものか判断してください。
@@ -217,8 +220,8 @@ ${JSON.stringify(existingTasks, null, 2)}
   "message": "ユーザーへの返答メッセージ",
   "extractedTask": {
     "title": "タスクのタイトル",
-    "dueDate": "期限",
-    "priority": "1~100の整数",
+    "dueDate": "期限。絶対日時 YYYY-MM-DD HH:MM:SS 書式",
+    "priority": "1(最低) から 100(最高) までの整数値",
     "reason": "優先度の理由",
     "tags": []
   },
@@ -253,7 +256,7 @@ ${context ? "これまでの会話：\n" + context : ""}
 
     // Gemini API呼び出し
     const result = await axios.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + process.env.REACT_APP_GEMINI_API_KEY,
+      `https://generativelanguage.googleapis.com/v1beta/models/${AIMODEL}:generateContent?key=` + process.env.REACT_APP_GEMINI_API_KEY,
       {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         safetySettings: [
@@ -268,6 +271,8 @@ ${context ? "これまでの会話：\n" + context : ""}
     
     // レスポンス処理
     const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+    console.log(result.data.usageMetadata);
     
     // JSONの抽出
     try {
