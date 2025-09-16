@@ -39,7 +39,7 @@ const ChatInterface: React.FC<{
   }, [messages]);
   
 
-  const handleSend = async () => {
+const handleSend = async () => {
     if (!user || !input.trim()) return;
     
     const userMsg: ChatMessage = {
@@ -55,7 +55,8 @@ const ChatInterface: React.FC<{
     setLoading(true);
     
     try {
-      // FirestoreからsystemPromptを取得する処理
+      // (前半部分は変更なし)
+      // ...
       const db = getFirestore();
       const userSettingsRef = doc(db, 'userSettings', user.uid);
       const docSnap = await getDoc(userSettingsRef);
@@ -80,8 +81,7 @@ const ChatInterface: React.FC<{
         body: JSON.stringify({
           message: input,
           context: recentMessages,
-          // 取得したsystemPromptをbodyに追加（存在しない場合はnull）
-          systemPrompt: systemPrompt ,
+          systemPrompt: systemPrompt,
           existingTasks: tasks.filter(t => t.status === 'todo')
         })
       });
@@ -107,45 +107,33 @@ const ChatInterface: React.FC<{
       
       setCurrentTask(prev => ({ ...prev, ...data.extractedTask }));
       
-      // --- ▼▼▼ actionに応じて処理を振り分ける ▼▼▼ ---
+      // --- ▼▼▼ ここから修正 ▼▼▼ ---
       if (data.action === 'create' && data.complete) {
+        // AIが返した数値の優先度 (もし取得できなければ50をデフォルト値とする)
+        const aiNumericPriority = data.extractedTask.priority || 50;
+
+        // 数値から high/medium/low の文字列に変換する
+        let priorityString: 'high' | 'medium' | 'low' = 'medium';
+        if (aiNumericPriority > 75) {
+          priorityString = 'high';
+        } else if (aiNumericPriority <= 35) {
+          priorityString = 'low';
+        }
+
         // タスク情報が完成したら保存 (新規作成)
         const finalTask: Task = {
           id: Date.now().toString(),
           task: data.extractedTask.title,
-          aiPriority: data.extractedTask.priority, // aiPriorityとして受け取る
+          aiPriority: aiNumericPriority, // AIからの数値をaiPriorityに設定
           dueDate: data.extractedTask.dueDate,
-          priority: 'medium', // 仮
+          priority: priorityString, // 数値に基づいて変換した文字列をpriorityに設定
           status: 'todo',
           reason: data.extractedTask.reason,
           tags: data.extractedTask.tags
         };
         onTaskCreated(finalTask);
         
-        // ... (完了メッセージを追加)
-
-      } else if (data.action === 'update') {
-        // タスクを更新
-        onTaskUpdated(data.updatedTask);
-        
-        // ... (更新完了メッセージを追加しても良い)
-      }
-
-      if (data.complete) {
-        const finalTask: Task = {
-          id: Date.now().toString(),
-          task: data.extractedTask.title,
-          aiPriority: data.extractedTask.priority === 'high' ? 80 : 
-                     data.extractedTask.priority === 'medium' ? 50 : 20,
-          dueDate: data.extractedTask.dueDate,
-          priority: data.extractedTask.priority,
-          status: 'todo',
-          reason: data.extractedTask.reason,
-          tags: data.extractedTask.tags
-        };
-        
-        onTaskCreated(finalTask);
-        
+        // タスク追加の完了メッセージをチャットに追加
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
           sender: 'ai',
@@ -154,7 +142,28 @@ const ChatInterface: React.FC<{
         }]);
         
         setCurrentTask({});
+
+      } else if (data.action === 'update') {
+        // タスクを更新
+        onTaskUpdated(data.updatedTask);
+        
+        // ここで更新完了メッセージを追加することもできます
+        setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            sender: 'ai',
+            content: `タスク「${data.updatedTask.task}」を更新しました！`,
+            timestamp: new Date()
+        }]);
       }
+      // --- ▲▲▲ ここまで修正 ▲▲▲ ---
+
+      // ▼▼▼ この if (data.complete) { ... } ブロックは完全に削除してください ▼▼▼
+      /*
+      if (data.complete) {
+        // ... (このブロック全体を削除)
+      }
+      */
+
     } catch (error) {
       console.error('エラー:', error);
       setMessages(prev => [...prev, {
@@ -167,7 +176,6 @@ const ChatInterface: React.FC<{
     
     setLoading(false);
   };
-
   
   // 選択肢クリック処理
   const handleOptionClick = (option: string) => {

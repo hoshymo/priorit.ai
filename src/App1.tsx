@@ -26,7 +26,7 @@ const fixTaskArray = (arr: any[]): Task[] =>
   arr.map((t: any, index: number) => ({
     id: t.id || `${Date.now()}-${index}`,
     task: t.task,
-    aiPriority: t.priority || t.aiPriority || DEFAULT_USERPRIORITY, // ← 互換性のための修正
+    aiPriority:  t.aiPriority || DEFAULT_USERPRIORITY, // ← 互換性のための修正
     userPriority: t.userPriority, // ← userPriorityを読み込む
     priority: t.priority || 'medium', // 優先度（high/medium/low）
     status: t.status || 'todo', // ステータス（todo/done）
