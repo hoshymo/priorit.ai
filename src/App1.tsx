@@ -16,6 +16,7 @@ import { Task } from "./types";
 import { useSnackbar } from 'notistack';
 import EditModal from './EditModal'; 
 
+
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
 
@@ -28,13 +29,18 @@ const fixTaskArray = (arr: any[]): Task[] =>
     task: t.task,
     aiPriority:  t.aiPriority || DEFAULT_USERPRIORITY, // ← 互換性のための修正
     userPriority: t.userPriority, // ← userPriorityを読み込む
-    priority: t.priority || 'medium', // 優先度（high/medium/low）
+    // priority: t.priority || 'medium', // 優先度（high/medium/low）
     status: t.status || 'todo', // ステータス（todo/done）
     reason: t.reason, // 理由（あれば）
     dueDate: t.dueDate, // 期限（あれば）
     tags: t.tags || [] // タグ（あれば）
   }));
 
+  
+
+
+
+  
 
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -63,7 +69,9 @@ const App: React.FC = () => {
 
   const [focusArea, setFocusArea] = useState<'list' | 'chat'>('list');
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // 600px以下
-
+useEffect(() => {
+  console.log("focusAreaが変更されました:", focusArea);
+}, [focusArea]);
   const todoTasks = tasks.filter(t => t.status === 'todo');
 
   const { enqueueSnackbar } = useSnackbar(); // ★ Snackbar用のhookを呼び出し
@@ -88,7 +96,17 @@ const App: React.FC = () => {
         if (loadedTasks.length > 0) {
           setSuggestionFetched(true); // 実行フラグを立てて再実行を防ぐ
           
-          try {
+      try {
+            // ▼ 追加: FirestoreからsystemPromptを取得する処理
+            const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+            const db = getFirestore();
+            const userSettingsRef = doc(db, 'userSettings', user.uid);
+            const docSnap = await getDoc(userSettingsRef);
+            let systemPrompt: string | null = null;
+            if (docSnap.exists() && docSnap.data().systemPrompt) {
+              systemPrompt = docSnap.data().systemPrompt;
+            }
+
             const idtoken = await user.getIdToken();
             const response = await fetch(`${BE_DOMAIN}/api/suggest`, {
               method: 'POST',
@@ -96,8 +114,10 @@ const App: React.FC = () => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${idtoken}`
               },
-              // 未完了のタスクだけをAIに渡す
-              body: JSON.stringify({ tasks: loadedTasks.filter(t => t.status === 'todo') }),
+              body: JSON.stringify({ 
+                tasks: loadedTasks.filter(t => t.status === 'todo'),
+                systemPrompt: systemPrompt // ▼ 追加: bodyにsystemPromptを含める
+              }),
             });
 
             if (!response.ok) throw new Error('サジェストの取得に失敗');
@@ -109,7 +129,6 @@ const App: React.FC = () => {
               setSuggestionComment(suggestion.comment);
               setHighlightedTaskId(suggestion.suggestedTaskId);
               setShowSuggestionModal(true);
-              // (発展) サジェストされたタスクをハイライトするなどの演出も可能
             }
           } catch (error) {
             console.error("サジェスト機能のエラー:", error);
@@ -163,13 +182,36 @@ const App: React.FC = () => {
     await saveTasks(user.uid, newTasks);
   };
 
+  const handleTasksUpdated = async (updatedTodoList: Task[]) => {
+    if (!user) return;
+
+    // バックエンドから返されたToDoタスクリストを取得
+    // このリストには、新しいタスク（仮のID）と、優先度が調整された既存タスクが含まれる
+    const finalTodoList = updatedTodoList.map(task => {
+        if (task.id.startsWith('temp-')) {
+        // 仮のIDを、ユニークな新しいIDに置き換える
+        return { ...task, id: Date.now().toString() + Math.random().toString(36).substring(2, 9) };
+        }
+        return task;
+    });
+
+    // 既存の完了済みタスクを取得
+    const doneTasks = tasks.filter(t => t.status === 'done');
+    
+    // 調整後のToDoタスクリストと、完了済みタスクを結合して、新しい全体のタスクリストを作成
+    const newFullTaskList = [...finalTodoList, ...doneTasks];
+    
+    setTasks(newFullTaskList);
+    await saveTasks(user.uid, newFullTaskList);
+  };
+
   const handleAddTaskFromModal = async () => {
     if (!user || !transcript.trim()) return;
     const newTask: Task = {
       id: Date.now().toString(),
       task: transcript.trim(),
       aiPriority: 50, // ← aiPriorityとして追加
-      priority: 'medium', // 優先度（high/medium/low）
+      // priority: 'medium', // 優先度（high/medium/low）
       status: 'todo' // ステータス（todo/done）
     };
     const newTasks = [...tasks, newTask];
@@ -285,27 +327,45 @@ const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
   };
 
   // --- LLMの優先度付け機能を修正 ---
+// --- 既存の handleRank 関数をこれに置き換えてください ---
   const handleRank = async () => {
     if (!user) return;
+
+    const todoTasks = tasks.filter(t => t.status === 'todo');
+    if (todoTasks.length === 0) {
+      alert("優先度を付けるタスクがありません。");
+      return;
+    }
+
     setLoading(true);
+
+    // AIへの指示をより具体的に変更
     const prompt = `
-あなたはタスク管理AIです。以下のタスク一覧に対し、緊急度・重要度・期限などを考慮してaiPriority（AIによる重要度）を1〜100の整数で付けてください。
-aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数とし、日本語は使わずJSON配列で返してください。
-例:
+あなたはタスク管理の専門家です。以下のタスクリスト全体を確認し、各タスクの優先度（aiPriority）が他のタスクとの関連で見て一貫性があるか、妥当であるかを評価してください。
+もし不整合や、もっと適切と思われる優先度があれば修正してください。修正が必要ない場合は、元のaiPriorityをそのまま使用してください。
+
+# 指示
+- 全てのタスクを総合的に評価してください。特に、期限(dueDate)、ユーザーによる調整(userPriority)、タスク内容の重要性を考慮してください。
+- aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数にしてください。
+- レスポンスは、元のタスクIDを含むJSON配列の形式で、全てのタスクを返してください。日本語は使わないでください。
+
+# 評価・修正対象のタスクリスト
+${JSON.stringify(todoTasks)}
+
+# レスポンス形式の例
 [
-  {"task": "メール返信", "aiPriority": 90},
-  {"task": "昼ごはん", "aiPriority": 20}
+  {"id": "1726550000000", "task": "プロジェクトAの報告書", "aiPriority": 95},
+  {"id": "1726551111111", "task": "牛乳を買う", "aiPriority": 30}
 ]
-タスク: ${JSON.stringify(tasks.map(t => t.task))}
   `;
 
   try {
-    const idtoken = await getAuth()?.currentUser?.getIdToken(/* forceRefresh */ false);
+    const idtoken = await getAuth()?.currentUser?.getIdToken(false);
     const response = await fetch(BE_DOMAIN + "/api/generate", {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${idtoken}` // 認証トークンを追加
+        "Authorization": `Bearer ${idtoken}`
       },
       body: JSON.stringify({ prompt }),
     });
@@ -320,18 +380,20 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     const jsonMatch = text.match(/\[[\s\S]*\]/);
 
     if (jsonMatch) {
-      const parsedResults: { task: string; aiPriority: number }[] = JSON.parse(jsonMatch[0]);
+      // taskのタイトルではなく、idで更新するように修正
+      const parsedResults: { id: string; aiPriority: number }[] = JSON.parse(jsonMatch[0]);
       
-      // AIの返却結果を既存のタスクにマージする
       const newTasks = tasks.map(originalTask => {
-        const rankedTask = parsedResults.find(p => p.task === originalTask.task);
+        // AIからの更新結果をIDで探す
+        const rankedTask = parsedResults.find(p => p.id === originalTask.id);
+        // 更新結果があればaiPriorityを更新し、なければ元のタスクをそのまま返す
         return rankedTask ? { ...originalTask, aiPriority: rankedTask.aiPriority } : originalTask;
       });
       
       setTasks(newTasks);
       await saveTasks(user.uid, newTasks);
     } else {
-      alert("LLMの返答からJSON部分が抽出できませんでした\n" + text);
+      alert("AIの応答からJSONデータを抽出できませんでした。\n" + text);
     }
   } catch (err) {
     alert(`APIリクエストでエラーが発生しました:\n\n${err}`);
@@ -372,7 +434,12 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     );
   if (!user) return <LoginButton />;
 
+
+  
   const TodoList = () => {
+      const suggestedTask = highlightedTaskId 
+      ? tasks.find(t => t.id === highlightedTaskId) 
+      : null;
     return (
     <Box sx={{
         display: 'flex',
@@ -384,11 +451,20 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     >
 
       <Dialog open={showSuggestionModal} onClose={() => setShowSuggestionModal(false)}>
-        <DialogTitle>今日はこのタスクを先に進めると、一番効果的かも！</DialogTitle>
+        {/* <DialogTitle>今日はこのタスクを先に進めると、一番効果的かも！</DialogTitle> */}
         <DialogContent>
           <Typography variant="body1">
             {suggestionComment}
           </Typography>
+
+          {suggestedTask && (
+            <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main' }}>
+              <Typography variant="h6" component="div">
+                {suggestedTask.task}
+              </Typography>
+              {/* 必要であれば他のタスク情報もここに追加できます */}
+            </Paper>
+          )}
         </DialogContent>
         <DialogActions>
           {/* ハイライトボタン（任意） */}
@@ -442,7 +518,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                 animation: `${rainbowSpin} 12s linear infinite`,
                 zIndex: -1,
               },
-              // 枠の内側に白背景を重ねて中身を静止させる
+              // 枠の内側に白背景を重ねて中身を静止させるA
               '&::after': {
                 content: '""',
                 position: 'absolute',
@@ -755,8 +831,8 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         {/* Chat content */}
         <ChatInterface 
           tasks={tasks} 
-          onTaskCreated={handleTaskCreated} 
           onTaskUpdated={handleTaskUpdated} // ← Step3で作成
+          onTasksUpdated={handleTasksUpdated}
         />      </Paper>
     </Box>
   );
