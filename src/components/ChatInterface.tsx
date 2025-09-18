@@ -90,6 +90,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
       } else if (data.action === 'update' && data.updatedTask) {
         // 既存のタスク更新処理
         onTaskUpdated(data.updatedTask);
+        
+        // ここで更新完了メッセージを追加することもできます
         setMessages(prev => [...prev, {
             id: Date.now().toString(), sender: 'ai', content: `タスク「${data.updatedTask.task}」を更新しました！`, timestamp: new Date()
         }]);
