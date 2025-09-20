@@ -7,10 +7,9 @@ import { saveTasks, loadTasks, DEFAULT_USERPRIORITY } from "./task";
 import { LoginButton } from "./loginbutton";
 import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
-import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Slide, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
-import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, PlusIcon, ScheduleIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
+import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Typography, Collapse, Paper, Tooltip } from '@mui/material';
+import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, ScheduleIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
-import { getAuth } from "firebase/auth";
 import ChatInterface from "./components/ChatInterface";
 import { Task } from "./types";
 import { useSnackbar } from 'notistack';
@@ -21,15 +20,12 @@ import EditModal from './EditModal';
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
 
 // 既存のデータ変換ロジック
-
-// 既存のデータ変換ロジックも修正
 const fixTaskArray = (arr: any[]): Task[] =>
   arr.map((t: any, index: number) => ({
     id: t.id || `${Date.now()}-${index}`,
     task: t.task,
     aiPriority:  t.aiPriority || DEFAULT_USERPRIORITY, // ← 互換性のための修正
     userPriority: t.userPriority, // ← userPriorityを読み込む
-    // priority: t.priority || 'medium', // 優先度（high/medium/low）
     status: t.status || 'todo', // ステータス（todo/done）
     reason: t.reason, // 理由（あれば）
     dueDate: t.dueDate, // 期限（あれば）
@@ -47,7 +43,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [inputTask, setInputTask] = useState("");
   
-   const [openHistoryModal, setOpenHistoryModal] = useState(false);
+  const [openHistoryModal, setOpenHistoryModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [openEditModal, setOpenEditModal] = useState(false);
 
@@ -87,7 +83,7 @@ const App: React.FC = () => {
     }
 
     const fetchTasksAndSuggestion = async () => {
-      try{
+      try {
         const taskData = await loadTasks(user.uid);
         const loadedTasks = fixTaskArray(taskData || []);
         setTasks(loadedTasks);
@@ -131,7 +127,7 @@ const App: React.FC = () => {
             }
           }
         }
-      } catch (error){
+      } catch (error) {
         console.error("サジェスト機能のエラー:", error);
       }
     };
@@ -243,7 +239,7 @@ const App: React.FC = () => {
     setEditingTask(null);
   };
 
-const handleUpdateTask = async (updatedTaskData: { id: string; task: string; userPriority?: number }) => {
+  const handleUpdateTask = async (updatedTaskData: { id: string; task: string; userPriority?: number }) => {
     if (!user) return;
     const newTasks = tasks.map(task => {
       if (task.id === updatedTaskData.id) {
@@ -289,8 +285,8 @@ const handleUpdateTask = async (updatedTaskData: { id: string; task: string; use
     // stateを更新
     setEditingTask({ ...editingTask, userPriority: currentPriority + adjustment });
   };
-  
-const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
+
+  const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
     if (!user) return;
     
     const newTasks = tasks.map(task => {
@@ -319,85 +315,6 @@ const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
     // setOpenMicModal(true);
     e.stopPropagation(); // click することでこの panel に focus が来てしまうのを防ぐ
     setFocusArea(focusArea == 'list' ? 'chat' : 'list');
-  };
-
-  // --- LLMの優先度付け機能を修正 ---
-// --- 既存の handleRank 関数をこれに置き換えてください ---
-  const handleRank = async () => {
-    if (!user) return;
-
-    const todoTasks = tasks.filter(t => t.status === 'todo');
-    if (todoTasks.length === 0) {
-      alert("優先度を付けるタスクがありません。");
-      return;
-    }
-
-    setLoading(true);
-
-    // AIへの指示をより具体的に変更
-    const prompt = `
-あなたはタスク管理の専門家です。以下のタスクリスト全体を確認し、各タスクの優先度（aiPriority）が他のタスクとの関連で見て一貫性があるか、妥当であるかを評価してください。
-もし不整合や、もっと適切と思われる優先度があれば修正してください。修正が必要ない場合は、元のaiPriorityをそのまま使用してください。
-
-# 指示
-- 全てのタスクを総合的に評価してください。特に、期限(dueDate)、ユーザーによる調整(userPriority)、タスク内容の重要性を考慮してください。
-- aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数にしてください。
-- レスポンスは、元のタスクIDを含むJSON配列の形式で、全てのタスクを返してください。日本語は使わないでください。
-
-# 評価・修正対象のタスクリスト
-${JSON.stringify(todoTasks)}
-
-# レスポンス形式の例
-[
-  {"id": "1726550000000", "task": "プロジェクトAの報告書", "aiPriority": 95},
-  {"id": "1726551111111", "task": "牛乳を買う", "aiPriority": 30}
-]
-  `;
-
-  try {
-    const idtoken = await getAuth()?.currentUser?.getIdToken(false);
-    const response = await fetch(BE_DOMAIN + "/api/generate", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idtoken}`
-      },
-      body: JSON.stringify({ prompt }),
-    });
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("API Error from server:", data);
-      throw new Error(data.detail?.error?.message || data.error || "不明なエラーです。");
-    }
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-
-    if (jsonMatch) {
-      // taskのタイトルではなく、idで更新するように修正
-      const parsedResults: { id: string; aiPriority: number }[] = JSON.parse(jsonMatch[0]);
-      
-      const newTasks = tasks.map(originalTask => {
-        // AIからの更新結果をIDで探す
-        const rankedTask = parsedResults.find(p => p.id === originalTask.id);
-        // 更新結果があればaiPriorityを更新し、なければ元のタスクをそのまま返す
-        return rankedTask ? { ...originalTask, aiPriority: rankedTask.aiPriority } : originalTask;
-      });
-      
-      setTasks(newTasks);
-      await saveTasks(user.uid, newTasks);
-    } else {
-      alert("AIの応答からJSONデータを抽出できませんでした。\n" + text);
-    }
-  } catch (err) {
-    alert(`APIリクエストでエラーが発生しました:\n\n${err}`);
-  }
-  setLoading(false);
-};
-
-  const handleToggleDark = () => {
-    setMode((mode === 'light' ? 'dark' : 'light'));
   };
 
   const GlowingCard = styled(Card)(({ theme }) => ({
