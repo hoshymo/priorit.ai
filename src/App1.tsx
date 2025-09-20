@@ -3,37 +3,34 @@ import { useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition";
 import { useSwipeable } from 'react-swipeable';
 import { UserContext } from "./Usercontext";
-import { saveTasks, loadTasks } from "./task";
+import { saveTasks, loadTasks, DEFAULT_USERPRIORITY } from "./task";
 import { LoginButton } from "./loginbutton";
 import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
-import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Slide, TextField, Typography, Slider, Switch, Collapse, Paper, Tooltip } from '@mui/material';
-import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, PlusIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
+import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Typography, Collapse, Paper, Tooltip } from '@mui/material';
+import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, ScheduleIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
-import { getAuth } from "firebase/auth";
 import ChatInterface from "./components/ChatInterface";
 import { Task } from "./types";
 import { useSnackbar } from 'notistack';
+import EditModal from './EditModal'; 
+
 
 // const BE_DOMAIN = window.location.hostname === "hoshymo.github.io" ? "https://backend-1064199407438.asia-northeast1.run.app" : "http://localhost:3001";
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
 
 // 既存のデータ変換ロジック
-
-// 既存のデータ変換ロジックも修正
 const fixTaskArray = (arr: any[]): Task[] =>
   arr.map((t: any, index: number) => ({
     id: t.id || `${Date.now()}-${index}`,
     task: t.task,
-    aiPriority: t.priority || t.aiPriority || 50, // ← 互換性のための修正
+    aiPriority:  t.aiPriority || DEFAULT_USERPRIORITY, // ← 互換性のための修正
     userPriority: t.userPriority, // ← userPriorityを読み込む
-    priority: t.priority || 'medium', // 優先度（high/medium/low）
     status: t.status || 'todo', // ステータス（todo/done）
     reason: t.reason, // 理由（あれば）
     dueDate: t.dueDate, // 期限（あれば）
     tags: t.tags || [] // タグ（あれば）
   }));
-
 
 const App: React.FC = () => {
   const navigate = useNavigate();
@@ -46,7 +43,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [inputTask, setInputTask] = useState("");
   
-   const [openHistoryModal, setOpenHistoryModal] = useState(false);
+  const [openHistoryModal, setOpenHistoryModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [openEditModal, setOpenEditModal] = useState(false);
 
@@ -62,11 +59,12 @@ const App: React.FC = () => {
 
   const [focusArea, setFocusArea] = useState<'list' | 'chat'>('list');
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // 600px以下
-
+// useEffect(() => { // TODO 消す
+//   console.log("focusAreaが変更されました:", focusArea);
+// }, [focusArea]);
   const todoTasks = tasks.filter(t => t.status === 'todo');
 
   const { enqueueSnackbar } = useSnackbar(); // ★ Snackbar用のhookを呼び出し
-  const [suggestionFetched, setSuggestionFetched] = useState(false); // ★ サジェストの多重実行を防ぐフラグ
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [suggestionComment, setSuggestionComment] = useState<string | null>(null); // ← 新しく追加
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
@@ -76,54 +74,67 @@ const App: React.FC = () => {
   50% { box-shadow: 0 0 15px 5px rgba(25, 118, 210, 0.8); }
   100% { box-shadow: 0 0 5px 2px rgba(25, 118, 210, 0.4); }
 `;
+  const SUGGESTION_TTL_MS = 5 * 60 * 1000;
+
   useEffect(() => {
-    // ユーザーがいて、まだサジェスト機能が実行されていない場合
-    if (user && !suggestionFetched) {
-      loadTasks(user.uid).then(async (data) => {
-        const loadedTasks = fixTaskArray(data || []);
+    if(!user){
+      setTasks([]);
+      return;
+    }
+
+    const fetchTasksAndSuggestion = async () => {
+      try {
+        const taskData = await loadTasks(user.uid);
+        const loadedTasks = fixTaskArray(taskData || []);
         setTasks(loadedTasks);
-        
-        // タスクが1件以上ある場合のみサジェスト機能を発火
-        if (loadedTasks.length > 0) {
-          setSuggestionFetched(true); // 実行フラグを立てて再実行を防ぐ
-          
-          try {
-            const idtoken = await user.getIdToken();
-            const response = await fetch(`${BE_DOMAIN}/api/suggest`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idtoken}`
-              },
-              // 未完了のタスクだけをAIに渡す
-              body: JSON.stringify({ tasks: loadedTasks.filter(t => t.status === 'todo') }),
-            });
 
-            if (!response.ok) throw new Error('サジェストの取得に失敗');
+        const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+        const db = getFirestore();
+        const userSettingsRef = doc(db, 'userSettings', user.uid);
+        const docSnap = await getDoc(userSettingsRef);
+        let systemPrompt: string | null = null;
+        if (docSnap.exists() && docSnap.data().systemPrompt) {
+          systemPrompt = docSnap.data().systemPrompt;
+        }
 
-            const suggestion = await response.json();
-            
-            // AIからのコメントがあれば通知として表示
-            if (suggestion.comment) {
-              setSuggestionComment(suggestion.comment);
-              setHighlightedTaskId(suggestion.suggestedTaskId);
-              setShowSuggestionModal(true);
-              // (発展) サジェストされたタスクをハイライトするなどの演出も可能
+        const lastFetchedRaw = localStorage.getItem('lastSuggestionFetchedAt');
+        const lastFetched = lastFetchedRaw ? Number(lastFetchedRaw) : 0;
+        const isExpired = Date.now() - lastFetched > SUGGESTION_TTL_MS;
+
+        const isNewUserWithoutWelcome = loadedTasks.length === 0 && !localStorage.getItem('welcomeMessageShown');
+        const isExistingUserWithExpiredCache = loadedTasks.length > 0 && isExpired;
+        if (isNewUserWithoutWelcome || isExistingUserWithExpiredCache) {
+          const idtoken = await user.getIdToken();
+          const response = await fetch(`${BE_DOMAIN}/api/suggest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idtoken}` },
+            body: JSON.stringify({
+              tasks: loadedTasks.filter(t => t.status === 'todo'),
+              systemPrompt: systemPrompt,
+            }),
+          });
+          if (!response.ok) throw new Error('サジェストの取得に失敗');
+          const suggestion = await response.json();
+          if (suggestion.comment) {
+            setSuggestionComment(suggestion.comment);
+            setHighlightedTaskId(suggestion.suggestedTaskId);
+            setShowSuggestionModal(true);
+            if (isNewUserWithoutWelcome) {
+              localStorage.setItem('welcomeMessageShown', 'true');
             }
-          } catch (error) {
-            console.error("サジェスト機能のエラー:", error);
-            // エラーが発生したことはユーザーに通知しない（サイレントフェイル）
+            if (isExistingUserWithExpiredCache) {
+              localStorage.setItem('lastSuggestionFetchedAt', String(Date.now()));
+            }
           }
         }
-      });
-    } else if (!user) {
-      // ログアウト時などに状態をリセット
-      setTasks([]);
-      setSuggestionFetched(false); 
-    }
-  }, [user, suggestionFetched]);
+      } catch (error) {
+        console.error("サジェスト機能のエラー:", error);
+      }
+    };
+    fetchTasksAndSuggestion();
+  }, [user]);
 
-  // --- タスク追加時のaiPriorityをデフォルト値(50)に設定 ---
+  // --- タスク追加時のaiPriorityをデフォルト値に設定 ---
   const handleAddTaskManual = async () => {
     if (!user || !inputTask.trim()) return;
     const newTask = { 
@@ -162,13 +173,36 @@ const App: React.FC = () => {
     await saveTasks(user.uid, newTasks);
   };
 
+  const handleTasksUpdated = async (updatedTodoList: Task[]) => {
+    if (!user) return;
+
+    // バックエンドから返されたToDoタスクリストを取得
+    // このリストには、新しいタスク（仮のID）と、優先度が調整された既存タスクが含まれる
+    const finalTodoList = updatedTodoList.map(task => {
+        if (task.id.startsWith('temp-')) {
+        // 仮のIDを、ユニークな新しいIDに置き換える
+        return { ...task, id: Date.now().toString() + Math.random().toString(36).substring(2, 9) };
+        }
+        return task;
+    });
+
+    // 既存の完了済みタスクを取得
+    const doneTasks = tasks.filter(t => t.status === 'done');
+    
+    // 調整後のToDoタスクリストと、完了済みタスクを結合して、新しい全体のタスクリストを作成
+    const newFullTaskList = [...finalTodoList, ...doneTasks];
+    
+    setTasks(newFullTaskList);
+    await saveTasks(user.uid, newFullTaskList);
+  };
+
   const handleAddTaskFromModal = async () => {
     if (!user || !transcript.trim()) return;
     const newTask: Task = {
       id: Date.now().toString(),
       task: transcript.trim(),
       aiPriority: 50, // ← aiPriorityとして追加
-      priority: 'medium', // 優先度（high/medium/low）
+      // priority: 'medium', // 優先度（high/medium/low）
       status: 'todo' // ステータス（todo/done）
     };
     const newTasks = [...tasks, newTask];
@@ -205,11 +239,15 @@ const App: React.FC = () => {
     setEditingTask(null);
   };
 
-  const handleUpdateTask = async () => {
-    if (!user || !editingTask) return;
-    const newTasks = tasks.map(task => 
-      task.id === editingTask.id ? editingTask : task
-    );
+  const handleUpdateTask = async (updatedTaskData: { id: string; task: string; userPriority?: number }) => {
+    if (!user) return;
+    const newTasks = tasks.map(task => {
+      if (task.id === updatedTaskData.id) {
+        // スプレッド構文で既存のタスク情報に更新情報をマージ
+        return { ...task, ...updatedTaskData };
+      }
+      return task;
+    });
     setTasks(newTasks);
     await saveTasks(user.uid, newTasks);
     handleCloseEditModal();
@@ -240,24 +278,21 @@ const App: React.FC = () => {
 
   const handleUserPriorityAdjustment = (adjustment: number) => {
     if (!editingTask) return;
-    
-    // 現在の優先度を取得。未設定(null or undefined)の場合はデフォルト値の50を基準にする
-    const currentPriority = editingTask.userPriority ?? 50;
-    
-    // 優先度を調整し、0〜100の範囲に収める
-    const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
-    
+
+    // 現在の優先度を取得。未設定(null or undefined)の場合はデフォルト値を基準にする
+    const currentPriority = editingTask.userPriority ?? DEFAULT_USERPRIORITY;
+
     // stateを更新
-    setEditingTask({ ...editingTask, userPriority: newPriority });
+    setEditingTask({ ...editingTask, userPriority: currentPriority + adjustment });
   };
-  
-const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
+
+  const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
     if (!user) return;
     
     const newTasks = tasks.map(task => {
       // IDが一致するタスクを見つけたら、優先度を更新
       if (task.id === taskId) {
-        const currentPriority = task.userPriority ?? 50; // 未設定の場合は50を基準
+        const currentPriority = task.userPriority ?? DEFAULT_USERPRIORITY;
         const newPriority = Math.max(0, Math.min(100, currentPriority + adjustment));
         return { ...task, userPriority: newPriority };
       }
@@ -280,65 +315,6 @@ const handleUserPriorityOnCard = async (taskId: string, adjustment: number) => {
     // setOpenMicModal(true);
     e.stopPropagation(); // click することでこの panel に focus が来てしまうのを防ぐ
     setFocusArea(focusArea == 'list' ? 'chat' : 'list');
-  };
-
-  // --- LLMの優先度付け機能を修正 ---
-  const handleRank = async () => {
-    if (!user) return;
-    setLoading(true);
-    const prompt = `
-あなたはタスク管理AIです。以下のタスク一覧に対し、緊急度・重要度・期限などを考慮してaiPriority（AIによる重要度）を1〜100の整数で付けてください。
-aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数とし、日本語は使わずJSON配列で返してください。
-例:
-[
-  {"task": "メール返信", "aiPriority": 90},
-  {"task": "昼ごはん", "aiPriority": 20}
-]
-タスク: ${JSON.stringify(tasks.map(t => t.task))}
-  `;
-
-  try {
-    const idtoken = await getAuth()?.currentUser?.getIdToken(/* forceRefresh */ false);
-    const response = await fetch(BE_DOMAIN + "/api/generate", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${idtoken}` // 認証トークンを追加
-      },
-      body: JSON.stringify({ prompt }),
-    });
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("API Error from server:", data);
-      throw new Error(data.detail?.error?.message || data.error || "不明なエラーです。");
-    }
-
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-
-    if (jsonMatch) {
-      const parsedResults: { task: string; aiPriority: number }[] = JSON.parse(jsonMatch[0]);
-      
-      // AIの返却結果を既存のタスクにマージする
-      const newTasks = tasks.map(originalTask => {
-        const rankedTask = parsedResults.find(p => p.task === originalTask.task);
-        return rankedTask ? { ...originalTask, aiPriority: rankedTask.aiPriority } : originalTask;
-      });
-      
-      setTasks(newTasks);
-      await saveTasks(user.uid, newTasks);
-    } else {
-      alert("LLMの返答からJSON部分が抽出できませんでした\n" + text);
-    }
-  } catch (err) {
-    alert(`APIリクエストでエラーが発生しました:\n\n${err}`);
-  }
-  setLoading(false);
-};
-
-  const handleToggleDark = () => {
-    setMode((mode === 'light' ? 'dark' : 'light'));
   };
 
   const GlowingCard = styled(Card)(({ theme }) => ({
@@ -370,23 +346,37 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
     );
   if (!user) return <LoginButton />;
 
+
+  
   const TodoList = () => {
+      const suggestedTask = highlightedTaskId 
+      ? tasks.find(t => t.id === highlightedTaskId) 
+      : null;
     return (
     <Box sx={{
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center',
-        height: '100%',
+        // alignItems: 'center',
+        maxHeight: '100%',
         width: '100%'
       }}
     >
 
       <Dialog open={showSuggestionModal} onClose={() => setShowSuggestionModal(false)}>
-        <DialogTitle>今日はこのタスクを先に進めると、一番効果的かも！</DialogTitle>
+        {/* <DialogTitle>今日はこのタスクを先に進めると、一番効果的かも！</DialogTitle> */}
         <DialogContent>
           <Typography variant="body1">
             {suggestionComment}
           </Typography>
+
+          {suggestedTask && (
+            <Paper variant="outlined" sx={{ mt: 2, p: 2, borderColor: 'primary.main' }}>
+              <Typography variant="h6" component="div">
+                {suggestedTask.task}
+              </Typography>
+              {/* 必要であれば他のタスク情報もここに追加できます */}
+            </Paper>
+          )}
         </DialogContent>
         <DialogActions>
           {/* ハイライトボタン（任意） */}
@@ -405,8 +395,8 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
             const sortedTasks = todoTasks
                 .slice()
                 .sort((a, b) => {
-                const userPriorityA = a.userPriority || 50; // 未設定は中間値として扱う
-                const userPriorityB = b.userPriority || 50;
+                const userPriorityA = a.userPriority || DEFAULT_USERPRIORITY;
+                const userPriorityB = b.userPriority || DEFAULT_USERPRIORITY;
                 const totalPriorityA = userPriorityA + a.aiPriority;
                 const totalPriorityB = userPriorityB + b.aiPriority;
                 return totalPriorityB - totalPriorityA;
@@ -440,7 +430,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                 animation: `${rainbowSpin} 12s linear infinite`,
                 zIndex: -1,
               },
-              // 枠の内側に白背景を重ねて中身を静止させる
+              // 枠の内側に白背景を重ねて中身を静止させるA
               '&::after': {
                 content: '""',
                 position: 'absolute',
@@ -472,6 +462,9 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
 
                         </CardContent>
 
+                            {/* <Typography variant="body2" color="text.secondary" component="div">
+                                {t.dueDate}
+                            </Typography> */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1 }}>
                             <Box>
                               <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
@@ -482,7 +475,14 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                               </IconButton>
                             </Box>
                             <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                              優先度: {t.aiPriority}
+                              {/* ユーザー優先度が設定されていたら表示 */}
+                              <Tooltip title={t.userPriority}>
+                                <IconButton size="small" sx={{ color: t.userPriority ? 'pink' : 'gray' }}>
+                                  <ThumbUpIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                                {/* 優先度合計値。ちょっと冗長だが、number 型なのに string が入っていることがあるようで editor での警告表示除去対策もありこの表記に。 */}
+                                {(typeof t.aiPriority === 'string' ? parseInt(t.aiPriority) : t.aiPriority) + (t.userPriority ?? DEFAULT_USERPRIORITY)}
                                 {/* 理由表示用ツールチップ */}
                                 {t.reason && (
                                   <Tooltip title={t.reason}>
@@ -491,21 +491,20 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                                     </IconButton>
                                   </Tooltip>
                                 )}
-                            {/* ユーザー優先度が設定されていれば、50を基準とした±値を青字で表示 */}
-                            {t.userPriority != null && (
-                                <Box component="span" sx={{ 
-                                color: '#1976d2', // MUIのデフォルトの青色
-                                fontWeight: 'bold',
-                                ml: 1 // marginLeft
-                                }}>
-                                ( {t.userPriority - 50 >= 0 ? '+' : ''}{t.userPriority - 50} )
-                                </Box>
-                            )}
+                                {/* 期限表示用ツールチップ */}
+                                {t.dueDate && (
+                                  <Tooltip title={t.dueDate}>
+                                    <IconButton size="small">
+                                      <ScheduleIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                             </Typography>
                             <Box>
-                              <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small"><CheckIcon /></IconButton>
                               <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
-                              <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton>
+                              <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="success" size="small"><CheckIcon /></IconButton>
+                              {/* いきなり削除はしなくていいかな。まずは done にすることにしよう */}
+                              {/* <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small"><DeleteIcon /></IconButton> */}
                             </Box>
                         </Box>
                   </CardWrapper>
@@ -524,43 +523,38 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
                         <Box sx={{ width: '100%', display: 'grid', gap: 1 }}>
                         {remainingTasks.map((t) => TaskCard(t))}
                         </Box>
+
+                        {/* --- 開閉ボタン --- */}
+                        <Button 
+                            onClick={() => setIsExpanded(!isExpanded)} 
+                            fullWidth 
+                            sx={{ mt: 1, mb: 10 }}
+                        >
+                            閉じる
+                        </Button>
                     </Collapse>
                     
                     {/* --- 開閉ボタン --- */}
+                    {!isExpanded && (
                     <Button 
                         onClick={() => setIsExpanded(!isExpanded)} 
                         fullWidth 
                         sx={{ mt: 1 }}
                     >
-                        {isExpanded ? '閉じる' : `残り${remainingTasks.length}件を見る`}
+                        残り {remainingTasks.length}件を見る
                     </Button>
+                    )}
                     </>
                 )}
                 </>
             );
             })()}
 
-          <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
+          {/* <Button onClick={handleRank} disabled={tasks.length === 0 || loading} variant="contained" color="primary" sx={{ my: 2, width: '100%' }}>
             {loading ? "Geminiが優先順位付け中..." : "LLMで優先順位を付ける"}
-          </Button>
+          </Button> */}
 
         </Box>
-
-      {/* --- 右下固定ボタン --- */}
-      <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
-        <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <SettingsIcon />
-        </IconButton>
-        <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <HistoryIcon />
-        </IconButton>
-      {/* --- 音声入力開始ボタン --- チャットモードでは非表示 */}
-      {!showChat && (
-        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
-          <ChatIcon fontSize="large" />
-        </IconButton>
-      )}
-      </Box>
 
       {/* --- 音声入力モーダル --- */}
       <Dialog open={openMicModal} onClose={handleCloseMicModal} fullWidth>
@@ -586,41 +580,17 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         )}
       </Dialog>
 
-      {/* --- 編集モーダル --- */}
-      <Dialog open={openEditModal} onClose={handleCloseEditModal} fullWidth>
-        <DialogTitle>タスクの編集</DialogTitle>
-        <DialogContent>
-          <TextField autoFocus margin="dense" label="タスク内容" type="text" fullWidth variant="standard" value={editingTask?.task || ""} onChange={handleEditInputChange} sx={{ mb: 4 }} />
-          <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Typography variant="caption" display="block">
-              ユーザー優先度
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
-              <IconButton color="error" onClick={() => handleUserPriorityAdjustment(-10)} size="large">
-                <ThumbDownIcon />
-              </IconButton>
-              
-              <Typography variant="h5" component="div" sx={{ minWidth: 60, textAlign: 'center' }}>
-                {editingTask?.userPriority ?? 50}
-              </Typography>
-
-              <IconButton color="primary" onClick={() => handleUserPriorityAdjustment(10)} size="large">
-                <ThumbUpIcon />
-              </IconButton>
-            </Box>
+          <Box>
+            {/* 既存の編集モーダルは削除し、以下のコンポーネントに置き換える */}
+            {editingTask && (
+              <EditModal
+                open={openEditModal}
+                task={editingTask}
+                onClose={handleCloseEditModal}
+                onUpdate={handleUpdateTask}
+              />
+            )}
           </Box>
-          </DialogContent>
-        <DialogActions>
-            <Button onClick={handleCloseEditModal}>キャンセル</Button>
-            <Button 
-            onClick={handleUpdateTask} 
-            color="primary"
-            variant="contained"
-            >
-            保存する
-            </Button>
-        </DialogActions>      
-        </Dialog>
 
         <Dialog open={openHistoryModal} onClose={() => setOpenHistoryModal(false)} fullWidth scroll="paper">
         <DialogTitle>完了したタスクの履歴</DialogTitle>
@@ -715,7 +685,10 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           top: 0,
           left: 0,
           width: isMobile ? '100%' : '50%',
-          height: '100%',
+          height: '100dvh',
+          overflow: 'auto',
+          pt: 1,
+          pb: 1,
           transform: isMobile
             ? focusArea === 'list'
               ? 'translateX(0%)'
@@ -729,6 +702,24 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         <TodoList />
       </Paper>
 
+      {/* --- 右下固定ボタン --- */}
+      {focusArea === 'list' && (
+      <Box sx={{ position: 'fixed', bottom: 20, right: isMobile ? 20 : '52%', zIndex: 1000, display: 'flex', gap: 1, alignItems: 'center' }}>
+        <IconButton onClick={() => navigate('/settings')} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <SettingsIcon />
+        </IconButton>
+        <IconButton onClick={() => setOpenHistoryModal(true)} color="primary" size="small" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <HistoryIcon />
+        </IconButton>
+      {/* --- 音声入力開始ボタン --- チャットモードでは非表示 */}
+      {!showChat && (
+        <IconButton onClick={handleOpenMicModal} color="primary" size="large" sx={{ bgcolor: 'background.paper', '&:hover': { bgcolor: theme.palette.action.hover }}}>
+          <ChatIcon fontSize="large" />
+        </IconButton>
+      )}
+      </Box>
+      )}
+
       {/* Chat Window */}
       <Paper
         {...swipeHandlers}
@@ -739,7 +730,7 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
           top: 0,
           left: 0,
           width: isMobile ? '90%' : '50%',
-          height: '100%',
+          height: '100dvh',
           transform: isMobile
             ? focusArea === 'chat'
               ? 'translateX(10%)'
@@ -752,8 +743,8 @@ aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数
         {/* Chat content */}
         <ChatInterface 
           tasks={tasks} 
-          onTaskCreated={handleTaskCreated} 
           onTaskUpdated={handleTaskUpdated} // ← Step3で作成
+          onTasksUpdated={handleTasksUpdated}
         />      </Paper>
     </Box>
   );

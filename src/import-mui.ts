@@ -11,6 +11,7 @@ export { default as EditIcon } from '@mui/icons-material/Edit';
 export { default as SettingsIcon } from '@mui/icons-material/Settings';
 export { default as MicIcon } from '@mui/icons-material/Mic';
 export { default as PlusIcon } from '@mui/icons-material/PlusOneRounded';
+export { default as ScheduleIcon } from '@mui/icons-material/Schedule';
 export { default as SendIcon } from '@mui/icons-material/Send';
 export { default as InfoIcon } from '@mui/icons-material/Info';
 export { default as SaveIcon } from '@mui/icons-material/Save';

@@ -1,36 +1,27 @@
 import { db } from "./firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 
+export const DEFAULT_USERPRIORITY: number = 0;
+
 // タスク保存
 export async function saveTasks(userId: string, tasks: any[]) {
-  // ▼▼▼【ここから修正】▼▼▼
   // Firestoreに保存する前に、undefinedの値をnullに変換する
   const tasksToSave = tasks.map(task => {
-    // 元のtaskオブジェクトを変更しないようにコピーを作成
-    const newTask = { ...task };
-
-    // userPriorityがundefinedの場合、nullに置き換える
-    if (newTask.userPriority === undefined) {
-      newTask.userPriority = null;
-    }
-    // (もしあれば) deadlineプロパティも同様に対応しておくと安全です
-    if (newTask.deadline === undefined) {
-      newTask.deadline = null;
-    }
-
-    return newTask;
+    // オブジェクトの各キーをループして、値がundefinedならnullに置き換える
+    const sanitizedTask = Object.fromEntries(
+      Object.entries(task).map(([key, value]) => [key, value === undefined ? null : value])
+    );
+    return sanitizedTask;
   });
-  // ▲▲▲【ここまで修正】▲▲▲
 
   try {
     // 変換後のデータを { list: ... } の形式で保存
     await setDoc(doc(db, "tasks", userId), { list: tasksToSave });
   } catch (error) {
+    // エラー発生時に、どのデータが問題だったかログに出力するとデバッグしやすい
     console.error("Error saving tasks:", error);
-    // エラーが発生したことをユーザーに知らせる処理をここに追加することもできます
+    console.error("Data that caused the error:", tasksToSave);
   }
-  
-  
 }
 
 // タスク取得 (この関数は変更不要です)

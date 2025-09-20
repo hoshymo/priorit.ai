@@ -47,6 +47,13 @@ const NotePage: React.FC = () => {
       setSaving(false);
     }
   };
+
+  const handleReset = () => {
+    if (user) {
+      loadSystemPrompt(user.uid)
+        .then(setPrompt)
+    }
+  }
   
   // テーマ切り替えハンドラー
   const handleThemeToggle = () => {
@@ -88,8 +95,14 @@ const NotePage: React.FC = () => {
         rows={6}
         fullWidth
         value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+        onChange={(e) => {
+          const newValue = e.target.value;
+          if (newValue.length <= 200) {
+            setPrompt(newValue);
+          }
+        }}
         variant="outlined"
+        helperText={`${prompt.length} / ${200} 文字`}
       />
       <Button
         variant="contained"
@@ -101,7 +114,7 @@ const NotePage: React.FC = () => {
       </Button>
       <Button
         variant="contained"
-        onClick={() => console.log("Reset.")}
+        onClick={handleReset}
         sx={{ m: 2 }}
       >
         リセット

@@ -7,7 +7,7 @@ export type Task = {
   
   // 新規追加フィールド
   dueDate?: string;       // ISO形式または相対表現文字列
-  priority: 'high' | 'medium' | 'low';
+  // priority: 'high' | 'medium' | 'low';
   status: 'todo' | 'done';
   reason?: string;        // AIによる優先度の理由
   tags?: string[];        // 抽出されたタグ

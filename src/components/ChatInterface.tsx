@@ -11,11 +11,15 @@ import { ChatMessage, Task } from '../types';
 // 環境変数からバックエンドドメインを取得
 const BE_DOMAIN = (import.meta.env.VITE_BE_DOMAIN as string) ?? "http://localhost:3001";
 
-const ChatInterface: React.FC<{
+// ▼▼▼ propsの型定義を修正 ▼▼▼
+interface ChatInterfaceProps {
   tasks: Task[];
-  onTaskCreated: (task: Task) => void;
-  onTaskUpdated: (task: Task) => void;
-}> = ({ tasks, onTaskCreated, onTaskUpdated }) => {
+  onTaskUpdated: (task: Partial<Task> & { id: string }) => void;
+  // onTaskCreated は不要になり、こちらを新しく追加
+  onTasksUpdated: (tasks: Task[]) => void; 
+}
+
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onTasksUpdated }) => {
   const { user } = useContext(UserContext);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -42,137 +46,73 @@ const ChatInterface: React.FC<{
   const handleSend = async () => {
     if (!user || !input.trim()) return;
     
-    const userMsg: ChatMessage = {
-      id: Date.now().toString(),
-      sender: 'user',
-      content: input,
-      timestamp: new Date()
-    };
-    
+    const userMsg: ChatMessage = { id: Date.now().toString(), sender: 'user', content: input, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
+    const messageToSend = input;
     setInput('');
     resetTranscript();
     setLoading(true);
     
     try {
-      // FirestoreからsystemPromptを取得する処理
       const db = getFirestore();
       const userSettingsRef = doc(db, 'userSettings', user.uid);
       const docSnap = await getDoc(userSettingsRef);
+      const systemPrompt = (docSnap.exists() && docSnap.data().systemPrompt) ? docSnap.data().systemPrompt : null;
 
-      let systemPrompt: string | null = null;
-      if (docSnap.exists() && docSnap.data().systemPrompt) {
-        systemPrompt = docSnap.data().systemPrompt;
-      }
-
-      const recentMessages = messages.slice(-5).map(m => 
-        `${m.sender === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`
-      ).join('\n');
-      
+      const recentMessages = messages.slice(-5).map(m => `${m.sender === 'user' ? 'ユーザー' : 'AI'}: ${m.content}`).join('\n');
       const idtoken = await user.getIdToken();
 
       const response = await fetch(`${BE_DOMAIN}/api/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idtoken}`
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idtoken}` },
         body: JSON.stringify({
-          message: input,
+          message: messageToSend,
           context: recentMessages,
-          // 取得したsystemPromptをbodyに追加（存在しない場合はnull）
-          systemPrompt: systemPrompt ,
+          systemPrompt: systemPrompt,
           existingTasks: tasks.filter(t => t.status === 'todo')
         })
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("API Error Response:", errorData);
-        throw new Error(errorData.error || 'APIリクエストに失敗しました');
+        throw new Error((await response.json()).error || 'APIリクエストに失敗しました');
       }
       
       const data = await response.json();
       
-      const aiMsg: ChatMessage = {
-        id: Date.now().toString(),
-        sender: 'ai',
-        content: data.message,
-        timestamp: new Date(),
-        suggestedTask: data.extractedTask,
-        options: data.options
-      };
-      
+      const aiMsg: ChatMessage = { id: Date.now().toString(), sender: 'ai', content: data.message, timestamp: new Date(), options: data.options };
       setMessages(prev => [...prev, aiMsg]);
       
-      setCurrentTask(prev => ({ ...prev, ...data.extractedTask }));
-      
-      // --- ▼▼▼ actionに応じて処理を振り分ける ▼▼▼ ---
-      if (data.action === 'create' && data.complete) {
-        // タスク情報が完成したら保存 (新規作成)
-        const finalTask: Task = {
-          id: Date.now().toString(),
-          task: data.extractedTask.title,
-          aiPriority: data.extractedTask.priority, // aiPriorityとして受け取る
-          dueDate: data.extractedTask.dueDate,
-          priority: 'medium', // 仮
-          status: 'todo',
-          reason: data.extractedTask.reason,
-          tags: data.extractedTask.tags
-        };
-        onTaskCreated(finalTask);
+      // --- レスポンス処理を修正 ---
+      if (data.action === 'create' && data.updatedTasks) {
+        // バックエンドから返された「調整済みの全タスクリスト」で更新
+        onTasksUpdated(data.updatedTasks);
         
-        // ... (完了メッセージを追加)
-
-      } else if (data.action === 'update') {
-        // タスクを更新
+      } else if (data.action === 'update' && data.updatedTask) {
+        // 既存のタスク更新処理
         onTaskUpdated(data.updatedTask);
         
-        // ... (更新完了メッセージを追加しても良い)
+        // ここで更新完了メッセージを追加することもできます
+        setMessages(prev => [...prev, {
+            id: Date.now().toString(), sender: 'ai', content: `タスク「${data.updatedTask.task}」を更新しました！`, timestamp: new Date()
+        }]);
       }
 
-      if (data.complete) {
-        const finalTask: Task = {
-          id: Date.now().toString(),
-          task: data.extractedTask.title,
-          aiPriority: data.extractedTask.priority === 'high' ? 80 : 
-                     data.extractedTask.priority === 'medium' ? 50 : 20,
-          dueDate: data.extractedTask.dueDate,
-          priority: data.extractedTask.priority,
-          status: 'todo',
-          reason: data.extractedTask.reason,
-          tags: data.extractedTask.tags
-        };
-        
-        onTaskCreated(finalTask);
-        
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          sender: 'ai',
-          content: `タスク「${finalTask.task}」を追加しました！`,
-          timestamp: new Date()
-        }]);
-        
-        setCurrentTask({});
-      }
     } catch (error) {
       console.error('エラー:', error);
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        sender: 'ai',
-        content: 'すみません、エラーが発生しました。もう一度お試しください。',
-        timestamp: new Date()
-      }]);
+      // setMessages(prev => [...prev, {
+      //   id: Date.now().toString(), sender: 'ai', content: `すみません、エラーが発生しました: ${error.message}`, timestamp: new Date()
+      // }]);
     }
     
     setLoading(false);
   };
-
   
   // 選択肢クリック処理
   const handleOptionClick = (option: string) => {
     setInput(option);
-    handleSend();
+    setTimeout(() => {
+      handleSend();
+    },0);
   };
   
   return (
