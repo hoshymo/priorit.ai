@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Typography, Box, IconButton, Button } from '@mui/material';
 import { ThumbUpIcon, ThumbDownIcon } from './import-mui'; // import-muiからインポート
-import { DEFAULT_USERPRIORITY } from "./task";
+import { DEFAULT_AIPRIORITY, DEFAULT_USERPRIORITY } from "./task";
 
 // Propsの型を定義
 interface EditModalProps {
   open: boolean;
-  task: { id: string; task: string; userPriority?: number };
+  task: { id: string; task: string; aiPriority?: number, userPriority?: number };
   onClose: () => void;
   onUpdate: (updatedTask: { id: string; task: string; userPriority?: number }) => void;
 }
@@ -48,13 +48,19 @@ const EditModal: React.FC<EditModalProps> = ({ open, task, onClose, onUpdate }) 
           variant="standard"
           value={editingTask?.task || ""}
           onChange={handleEditInputChange}
-          sx={{ mb: 4 }}
+          sx={{ mb: 2 }}
         />
         <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Typography variant="caption" display="block">
+            AI優先度
+          </Typography>
+          <Typography variant="h5" component="div" sx={{ mb: 2, minWidth: 60, textAlign: 'center' }}>
+            {editingTask?.aiPriority ?? DEFAULT_AIPRIORITY}
+          </Typography>
+          <Typography variant="caption" display="block">
             ユーザー優先度
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mt: 0 }}>
             <IconButton color="error" onClick={() => handleUserPriorityAdjustment(-10)} size="large">
               <ThumbDownIcon />
             </IconButton>

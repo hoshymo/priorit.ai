@@ -114,7 +114,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
       handleSend();
     },0);
   };
-  
+
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh' }}>
       {/* メッセージ表示エリア */}
@@ -173,6 +176,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
       {/* 入力エリア */}
       <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {!(isIOS || isSafari) && (
           <IconButton 
             color="primary" 
             onClick={() => SpeechRecognition.startListening({ continuous: false, language: 'ja-JP' })}
@@ -180,6 +184,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
           >
             <MicIcon sx={{ color: listening ? 'error.main' : 'inherit' }} />
           </IconButton>
+          )}
           
           <TextField
             fullWidth
