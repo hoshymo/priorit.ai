@@ -458,7 +458,7 @@ ${JSON.stringify(todoTasks)}
           </Typography>
 
           {suggestedTask && (
-            <Paper variant="outlined" sx={{ p: 2, borderColor: 'primary.main' }}>
+            <Paper variant="outlined" sx={{ mt: 2, p: 2, borderColor: 'primary.main' }}>
               <Typography variant="h6" component="div">
                 {suggestedTask.task}
               </Typography>
