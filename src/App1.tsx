@@ -36,12 +36,6 @@ const fixTaskArray = (arr: any[]): Task[] =>
     tags: t.tags || [] // タグ（あれば）
   }));
 
-  
-
-
-
-  
-
 const App: React.FC = () => {
   const navigate = useNavigate();
 
@@ -69,13 +63,12 @@ const App: React.FC = () => {
 
   const [focusArea, setFocusArea] = useState<'list' | 'chat'>('list');
   const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // 600px以下
-useEffect(() => {
-  console.log("focusAreaが変更されました:", focusArea);
-}, [focusArea]);
+// useEffect(() => { // TODO 消す
+//   console.log("focusAreaが変更されました:", focusArea);
+// }, [focusArea]);
   const todoTasks = tasks.filter(t => t.status === 'todo');
 
   const { enqueueSnackbar } = useSnackbar(); // ★ Snackbar用のhookを呼び出し
-  const [suggestionFetched, setSuggestionFetched] = useState(false); // ★ サジェストの多重実行を防ぐフラグ
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [suggestionComment, setSuggestionComment] = useState<string | null>(null); // ← 新しく追加
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
@@ -85,19 +78,22 @@ useEffect(() => {
   50% { box-shadow: 0 0 15px 5px rgba(25, 118, 210, 0.8); }
   100% { box-shadow: 0 0 5px 2px rgba(25, 118, 210, 0.4); }
 `;
+  const SUGGESTION_TTL_MS = 5 * 60 * 1000;
+
   useEffect(() => {
+    const lastFetchedRaw = localStorage.getItem('lastSuggestionFetchedAt');
+    const lastFetched = typeof lastFetchedRaw === 'string' ? Number(lastFetchedRaw) : 0;
+    const now = Date.now();
+    const isExpired = now - lastFetched > SUGGESTION_TTL_MS;
+
     // ユーザーがいて、まだサジェスト機能が実行されていない場合
-    if (user && !suggestionFetched) {
+  if (user) {
       loadTasks(user.uid).then(async (data) => {
         const loadedTasks = fixTaskArray(data || []);
         setTasks(loadedTasks);
-        
-        // タスクが1件以上ある場合のみサジェスト機能を発火
-        if (loadedTasks.length > 0) {
-          setSuggestionFetched(true); // 実行フラグを立てて再実行を防ぐ
-          
+
       try {
-            // ▼ 追加: FirestoreからsystemPromptを取得する処理
+            // FirestoreからsystemPromptを取得する
             const { getFirestore, doc, getDoc } = await import("firebase/firestore");
             const db = getFirestore();
             const userSettingsRef = doc(db, 'userSettings', user.uid);
@@ -106,6 +102,11 @@ useEffect(() => {
             if (docSnap.exists() && docSnap.data().systemPrompt) {
               systemPrompt = docSnap.data().systemPrompt;
             }
+
+         // タスクが1件以上ある場合のみサジェスト機能を発火
+        if (loadedTasks.length > 0 && isExpired) {
+          // 最終 suggest 時間を更新 (短時間での再実行を抑制)
+          localStorage.setItem('lastSuggestionFetchedAt', String(Date.now()));
 
             const idtoken = await user.getIdToken();
             const response = await fetch(`${BE_DOMAIN}/api/suggest`, {
@@ -123,25 +124,24 @@ useEffect(() => {
             if (!response.ok) throw new Error('サジェストの取得に失敗');
 
             const suggestion = await response.json();
-            
+ 
             // AIからのコメントがあれば通知として表示
             if (suggestion.comment) {
               setSuggestionComment(suggestion.comment);
               setHighlightedTaskId(suggestion.suggestedTaskId);
               setShowSuggestionModal(true);
             }
+        }
           } catch (error) {
             console.error("サジェスト機能のエラー:", error);
             // エラーが発生したことはユーザーに通知しない（サイレントフェイル）
           }
-        }
       });
     } else if (!user) {
       // ログアウト時などに状態をリセット
       setTasks([]);
-      setSuggestionFetched(false); 
     }
-  }, [user, suggestionFetched]);
+  }, [user]);
 
   // --- タスク追加時のaiPriorityをデフォルト値に設定 ---
   const handleAddTaskManual = async () => {
