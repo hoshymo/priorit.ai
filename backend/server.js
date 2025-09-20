@@ -12,7 +12,7 @@ if (passIdTokenVerify) {
   console.log("Skipping ID token verification...");
 }
 
-const AIMODEL = process.env.AIMODEL ?? "gemini-1.5-flash-latest"; // モデル名を最新版に更新推奨
+const AIMODEL = process.env.AIMODEL ?? "gemini-2.0-flash"; // モデル名を最新版に更新推奨
 
 const app = express();
 app.use(cors({
