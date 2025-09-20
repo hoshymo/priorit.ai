@@ -81,66 +81,61 @@ const App: React.FC = () => {
   const SUGGESTION_TTL_MS = 5 * 60 * 1000;
 
   useEffect(() => {
-    const lastFetchedRaw = localStorage.getItem('lastSuggestionFetchedAt');
-    const lastFetched = typeof lastFetchedRaw === 'string' ? Number(lastFetchedRaw) : 0;
-    const now = Date.now();
-    const isExpired = now - lastFetched > SUGGESTION_TTL_MS;
+    if(!user){
+      setTasks([]);
+      return;
+    }
 
-    // ユーザーがいて、まだサジェスト機能が実行されていない場合
-  if (user) {
-      loadTasks(user.uid).then(async (data) => {
-        const loadedTasks = fixTaskArray(data || []);
+    const fetchTasksAndSuggestion = async () => {
+      try{
+        const taskData = await loadTasks(user.uid);
+        const loadedTasks = fixTaskArray(taskData || []);
         setTasks(loadedTasks);
 
-      try {
-            // FirestoreからsystemPromptを取得する
-            const { getFirestore, doc, getDoc } = await import("firebase/firestore");
-            const db = getFirestore();
-            const userSettingsRef = doc(db, 'userSettings', user.uid);
-            const docSnap = await getDoc(userSettingsRef);
-            let systemPrompt: string | null = null;
-            if (docSnap.exists() && docSnap.data().systemPrompt) {
-              systemPrompt = docSnap.data().systemPrompt;
-            }
-
-         // タスクが1件以上ある場合のみサジェスト機能を発火
-        if (loadedTasks.length > 0 && isExpired) {
-          // 最終 suggest 時間を更新 (短時間での再実行を抑制)
-          localStorage.setItem('lastSuggestionFetchedAt', String(Date.now()));
-
-            const idtoken = await user.getIdToken();
-            const response = await fetch(`${BE_DOMAIN}/api/suggest`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idtoken}`
-              },
-              body: JSON.stringify({ 
-                tasks: loadedTasks.filter(t => t.status === 'todo'),
-                systemPrompt: systemPrompt // ▼ 追加: bodyにsystemPromptを含める
-              }),
-            });
-
-            if (!response.ok) throw new Error('サジェストの取得に失敗');
-
-            const suggestion = await response.json();
- 
-            // AIからのコメントがあれば通知として表示
-            if (suggestion.comment) {
-              setSuggestionComment(suggestion.comment);
-              setHighlightedTaskId(suggestion.suggestedTaskId);
-              setShowSuggestionModal(true);
-            }
+        const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+        const db = getFirestore();
+        const userSettingsRef = doc(db, 'userSettings', user.uid);
+        const docSnap = await getDoc(userSettingsRef);
+        let systemPrompt: string | null = null;
+        if (docSnap.exists() && docSnap.data().systemPrompt) {
+          systemPrompt = docSnap.data().systemPrompt;
         }
-          } catch (error) {
-            console.error("サジェスト機能のエラー:", error);
-            // エラーが発生したことはユーザーに通知しない（サイレントフェイル）
+
+        const lastFetchedRaw = localStorage.getItem('lastSuggestionFetchedAt');
+        const lastFetched = lastFetchedRaw ? Number(lastFetchedRaw) : 0;
+        const isExpired = Date.now() - lastFetched > SUGGESTION_TTL_MS;
+
+        const isNewUserWithoutWelcome = loadedTasks.length === 0 && !localStorage.getItem('welcomeMessageShown');
+        const isExistingUserWithExpiredCache = loadedTasks.length > 0 && isExpired;
+        if (isNewUserWithoutWelcome || isExistingUserWithExpiredCache) {
+          const idtoken = await user.getIdToken();
+          const response = await fetch(`${BE_DOMAIN}/api/suggest`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idtoken}` },
+            body: JSON.stringify({
+              tasks: loadedTasks.filter(t => t.status === 'todo'),
+              systemPrompt: systemPrompt,
+            }),
+          });
+          if (!response.ok) throw new Error('サジェストの取得に失敗');
+          const suggestion = await response.json();
+          if (suggestion.comment) {
+            setSuggestionComment(suggestion.comment);
+            setHighlightedTaskId(suggestion.suggestedTaskId);
+            setShowSuggestionModal(true);
+            if (isNewUserWithoutWelcome) {
+              localStorage.setItem('welcomeMessageShown', 'true');
+            }
+            if (isExistingUserWithExpiredCache) {
+              localStorage.setItem('lastSuggestionFetchedAt', String(Date.now()));
+            }
           }
-      });
-    } else if (!user) {
-      // ログアウト時などに状態をリセット
-      setTasks([]);
-    }
+        }
+      } catch (error){
+        console.error("サジェスト機能のエラー:", error);
+      }
+    };
+    fetchTasksAndSuggestion();
   }, [user]);
 
   // --- タスク追加時のaiPriorityをデフォルト値に設定 ---
