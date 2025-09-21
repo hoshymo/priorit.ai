@@ -395,11 +395,8 @@ const App: React.FC = () => {
             const sortedTasks = todoTasks
                 .slice()
                 .sort((a, b) => {
-                const userPriorityA = a.userPriority || DEFAULT_USERPRIORITY;
-                const userPriorityB = b.userPriority || DEFAULT_USERPRIORITY;
-                const totalPriorityA = userPriorityA + a.aiPriority;
-                const totalPriorityB = userPriorityB + b.aiPriority;
-                return totalPriorityB - totalPriorityA;
+                  return (((b.userPriority ?? DEFAULT_USERPRIORITY) + b.aiPriority)
+                    - ((a.userPriority ?? DEFAULT_USERPRIORITY) + a.aiPriority));
                 });
 
             const topTasks = sortedTasks.slice(0, 3);
@@ -453,18 +450,10 @@ const App: React.FC = () => {
                       t.id === highlightedTaskId ? GlowingCard : Card;
                     return (
                     <CardWrapper key={t.id}>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="h6" component="div">
-                                {t.task}
-                            </Typography>
-                            </Box>
+                        <Typography variant="h6" component="div" sx={{ p: 1, pb: 0 }}>
+                            {t.task}
+                        </Typography>
 
-                        </CardContent>
-
-                            {/* <Typography variant="body2" color="text.secondary" component="div">
-                                {t.dueDate}
-                            </Typography> */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1 }}>
                             <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
                                 {/* 理由表示用ツールチップ */}

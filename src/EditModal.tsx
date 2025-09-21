@@ -50,7 +50,7 @@ const EditModal: React.FC<EditModalProps> = ({ open, task, onClose, onUpdate }) 
           onChange={handleEditInputChange}
           sx={{ mb: 2 }}
         />
-        <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <Typography variant="caption" display="block">
             AI優先度
           </Typography>
