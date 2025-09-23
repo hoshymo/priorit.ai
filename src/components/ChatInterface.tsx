@@ -82,19 +82,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
       const aiMsg: ChatMessage = { id: Date.now().toString(), sender: 'ai', content: data.message, timestamp: new Date(), options: data.options };
       setMessages(prev => [...prev, aiMsg]);
       
-      // --- レスポンス処理を修正 ---
       if (data.action === 'create' && data.updatedTasks) {
-        // バックエンドから返された「調整済みの全タスクリスト」で更新
         onTasksUpdated(data.updatedTasks);
         
+        const newTaskName = data.extractedTask?.task; // AIが抽出したタスク名を取得
+        const confirmationMsg: ChatMessage = {
+            id: `${Date.now()}-create-confirm`, 
+            sender: 'ai', 
+            content: newTaskName 
+                ? `タスク「${newTaskName}」を追加しました！` 
+                : 'タスクを追加しました！', 
+            timestamp: new Date()
+        };
+        setMessages(prev => [...prev, confirmationMsg]);
+
       } else if (data.action === 'update' && data.updatedTask) {
-        // 既存のタスク更新処理
         onTaskUpdated(data.updatedTask);
         
-        // ここで更新完了メッセージを追加することもできます
+        const originalTask = tasks.find(t => t.id === data.updatedTask.id);
+        const taskName = originalTask ? originalTask.task : 'タスク';
+
         setMessages(prev => [...prev, {
-            id: Date.now().toString(), sender: 'ai', content: `タスク「${data.updatedTask.task}」を更新しました！`, timestamp: new Date()
-        }]);
+            id: `${Date.now()}-update-confirm`, 
+            sender: 'ai', 
+            content: `タスク「${taskName}」を更新しました！`, 
+            timestamp: new Date()
+        }]);     
       }
 
     } catch (error) {
