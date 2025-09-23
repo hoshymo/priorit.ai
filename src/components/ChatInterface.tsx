@@ -98,10 +98,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
       }
 
     } catch (error) {
-      console.error('エラー:', error);
-      // setMessages(prev => [...prev, {
-      //   id: Date.now().toString(), sender: 'ai', content: `すみません、エラーが発生しました: ${error.message}`, timestamp: new Date()
-      // }]);
+      const msg = (error instanceof Error ? error.message : "Unknown error");
+      console.log(`err: ${msg}`);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(), sender: 'ai', content: `エラーが発生しました。`, timestamp: new Date()
+      }]);
     }
     
     setLoading(false);
