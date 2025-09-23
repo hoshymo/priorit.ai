@@ -82,26 +82,40 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
       const aiMsg: ChatMessage = { id: Date.now().toString(), sender: 'ai', content: data.message, timestamp: new Date(), options: data.options };
       setMessages(prev => [...prev, aiMsg]);
       
-      // --- レスポンス処理を修正 ---
       if (data.action === 'create' && data.updatedTasks) {
-        // バックエンドから返された「調整済みの全タスクリスト」で更新
         onTasksUpdated(data.updatedTasks);
         
+        const newTaskName = data.extractedTask?.task; // AIが抽出したタスク名を取得
+        const confirmationMsg: ChatMessage = {
+            id: `${Date.now()}-create-confirm`, 
+            sender: 'ai', 
+            content: newTaskName 
+                ? `タスク「${newTaskName}」を追加しました！` 
+                : 'タスクを追加しました！', 
+            timestamp: new Date()
+        };
+        setMessages(prev => [...prev, confirmationMsg]);
+
       } else if (data.action === 'update' && data.updatedTask) {
-        // 既存のタスク更新処理
         onTaskUpdated(data.updatedTask);
         
-        // ここで更新完了メッセージを追加することもできます
+        const originalTask = tasks.find(t => t.id === data.updatedTask.id);
+        const taskName = originalTask ? originalTask.task : 'タスク';
+
         setMessages(prev => [...prev, {
-            id: Date.now().toString(), sender: 'ai', content: `タスク「${data.updatedTask.task}」を更新しました！`, timestamp: new Date()
-        }]);
+            id: `${Date.now()}-update-confirm`, 
+            sender: 'ai', 
+            content: `タスク「${taskName}」を更新しました！`, 
+            timestamp: new Date()
+        }]);     
       }
 
     } catch (error) {
-      console.error('エラー:', error);
-      // setMessages(prev => [...prev, {
-      //   id: Date.now().toString(), sender: 'ai', content: `すみません、エラーが発生しました: ${error.message}`, timestamp: new Date()
-      // }]);
+      const msg = (error instanceof Error ? error.message : "Unknown error");
+      console.log(`err: ${msg}`);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(), sender: 'ai', content: `エラーが発生しました。`, timestamp: new Date()
+      }]);
     }
     
     setLoading(false);
@@ -114,7 +128,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
       handleSend();
     },0);
   };
-  
+
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '100vh' }}>
       {/* メッセージ表示エリア */}
@@ -173,6 +190,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
       {/* 入力エリア */}
       <Box sx={{ p: 1, borderTop: 1, borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {!(isIOS || isSafari) && (
           <IconButton 
             color="primary" 
             onClick={() => SpeechRecognition.startListening({ continuous: false, language: 'ja-JP' })}
@@ -180,6 +198,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ tasks, onTaskUpdated, onT
           >
             <MicIcon sx={{ color: listening ? 'error.main' : 'inherit' }} />
           </IconButton>
+          )}
           
           <TextField
             fullWidth

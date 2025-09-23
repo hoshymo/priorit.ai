@@ -142,6 +142,35 @@ GCP project を新しく set up するときの手順
 
 ※ Cloud Run で ID token verification する project が、frontend から送る ID token を生成する (Firebase Auth で使っている) project とおなじになっている必要がある ("aud" が合っている必要がある) ことに注意。逆の言い方をすると、Cloud Run と Firebase Auth が別 project で動作するようにする場合は何か工夫が必要。
 
+Database rule は以下のように設定して、他 user のデータを read/write できないようにします。
+
+```
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+  	match /tasks/{userId} {
+    	allow read: if request.auth != null && request.auth.uid == userId;
+    	allow create: if request.auth != null && request.auth.uid == userId;
+    	allow update: if request.auth != null && request.auth.uid == userId;
+    	allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+  	match /userSettings/{userId} {
+    	allow read: if request.auth != null && request.auth.uid == userId;
+    	allow create: if request.auth != null && request.auth.uid == userId;
+    	allow update: if request.auth != null && request.auth.uid == userId;
+    	allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+		match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
+
 
 ## Troubleshooting
 

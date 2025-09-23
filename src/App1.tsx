@@ -8,7 +8,7 @@ import { LoginButton } from "./loginbutton";
 import { useMediaQuery } from "@mui/material"
 import { keyframes, styled, useTheme } from '@mui/material/styles';
 import { Box, Card, Button, Divider, CardContent, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, TextField, Typography, Collapse, Paper, Tooltip } from '@mui/material';
-import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, ScheduleIcon, SettingsIcon, InfoIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
+import { ChatIcon, CheckIcon, DeleteIcon, EditIcon, ScheduleIcon, SettingsIcon, InfoIcon, RecyclingIcon, ThumbUpIcon, ThumbDownIcon, HistoryIcon } from './import-mui';
 import { ThemeContext } from './ThemeContext';
 import ChatInterface from "./components/ChatInterface";
 import { Task } from "./types";
@@ -395,11 +395,8 @@ const App: React.FC = () => {
             const sortedTasks = todoTasks
                 .slice()
                 .sort((a, b) => {
-                const userPriorityA = a.userPriority || DEFAULT_USERPRIORITY;
-                const userPriorityB = b.userPriority || DEFAULT_USERPRIORITY;
-                const totalPriorityA = userPriorityA + a.aiPriority;
-                const totalPriorityB = userPriorityB + b.aiPriority;
-                return totalPriorityB - totalPriorityA;
+                  return (((b.userPriority ?? DEFAULT_USERPRIORITY) + b.aiPriority)
+                    - ((a.userPriority ?? DEFAULT_USERPRIORITY) + a.aiPriority));
                 });
 
             const topTasks = sortedTasks.slice(0, 3);
@@ -453,36 +450,12 @@ const App: React.FC = () => {
                       t.id === highlightedTaskId ? GlowingCard : Card;
                     return (
                     <CardWrapper key={t.id}>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="h6" component="div">
-                                {t.task}
-                            </Typography>
-                            </Box>
+                        <Typography variant="h6" component="div" sx={{ p: 1, pb: 0 }}>
+                            {t.task}
+                        </Typography>
 
-                        </CardContent>
-
-                            {/* <Typography variant="body2" color="text.secondary" component="div">
-                                {t.dueDate}
-                            </Typography> */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1 }}>
-                            <Box>
-                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
-                                <ThumbDownIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, 10)}>
-                                <ThumbUpIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
                             <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                              {/* ユーザー優先度が設定されていたら表示 */}
-                              <Tooltip title={t.userPriority}>
-                                <IconButton size="small" sx={{ color: t.userPriority ? 'pink' : 'gray' }}>
-                                  <ThumbUpIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                                {/* 優先度合計値。ちょっと冗長だが、number 型なのに string が入っていることがあるようで editor での警告表示除去対策もありこの表記に。 */}
-                                {(typeof t.aiPriority === 'string' ? parseInt(t.aiPriority) : t.aiPriority) + (t.userPriority ?? DEFAULT_USERPRIORITY)}
                                 {/* 理由表示用ツールチップ */}
                                 {t.reason && (
                                   <Tooltip title={t.reason}>
@@ -499,6 +472,18 @@ const App: React.FC = () => {
                                     </IconButton>
                                   </Tooltip>
                                 )}
+                                {/* 直接ここに表示するには見た目の調整が必要 */}
+                                {/* { t.dueDate } */}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, -10)}>
+                                <ThumbDownIcon fontSize="small" sx={{ mr: 2, color: (theme) => t.userPriority ? theme.palette.error.main : theme.palette.action.disabled }}/>
+                              </IconButton>
+                              {/* 優先度合計値。ちょっと冗長だが、number 型なのに string が入っていることがあるようで editor での警告表示除去対策もありこの表記に。 */}
+                              {(typeof t.aiPriority === 'string' ? parseInt(t.aiPriority) : t.aiPriority) + (t.userPriority ?? DEFAULT_USERPRIORITY)}
+                              <IconButton size="small" onClick={() => handleUserPriorityOnCard(t.id, 10)}>
+                                <ThumbUpIcon fontSize="small" sx={{ ml: 2, color: (theme) => t.userPriority ? theme.palette.info.main : theme.palette.action.disabled }} />
+                              </IconButton>
                             </Typography>
                             <Box>
                               <IconButton onClick={() => handleOpenEditModal(t)} color="default" size="small"><EditIcon /></IconButton>
@@ -600,15 +585,15 @@ const App: React.FC = () => {
               .filter(t => t.status === 'done') // 完了タスクのみフィルタリング
               .map((t) => (
                 <Card key={t.id} sx={{ opacity: 0.8 }}>
-                  <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}> {/* Paddingを調整 */}
+                  <CardContent sx={{ py: 1, '&:last-child': { pb: 1 } }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography sx={{ textDecoration: 'line-through' }}>
                         {t.task}
                       </Typography>
-                      <Box>
-                        <Button size="small" onClick={() => handleToggleTaskStatus(t.id)}>
-                          戻す
-                        </Button>
+                      <Box sx={{ minWidth: 10, display: 'flex', gap: 0, justifyContent: 'flex-end' }}>
+                        <IconButton onClick={() => handleToggleTaskStatus(t.id)} color="info" size="small">
+                          <RecyclingIcon />
+                        </IconButton>
                         <IconButton onClick={() => handleDeleteTask(t.id)} color="warning" size="small">
                           <DeleteIcon />
                         </IconButton>

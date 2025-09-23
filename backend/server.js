@@ -128,12 +128,14 @@ app.post('/api/chat', async (req, res) => {
 # あなたの役割
 ユーザーとの対話を通じて、タスクの「新規作成」または「既存タスクの更新」を行ってください。
 ユーザーのメッセージの意図を正確に読み取り、適切なアクションを実行してください。
-あいまいな指定は適切にいい感じで変換してください。
 # ユーザー設定の system prompt
 ${systemPrompt}
 # 指示
 1. ユーザーのメッセージが新しいタスクに関するものか、既存タスクの変更に関するものか判断してください。
-2. 必要な情報が揃ったら、最終的な情報をJSON形式で提供してください。
+   - 「〜をやる」「〜を追加」のような場合は「新規作成」です。
+   - 「〜の期限を明日までにして」「〜の優先度を上げて」のように、既存タスクに言及している場合は「更新」です。
+2. 既存タスクの更新の場合、どのタスクに対する指示か、以下のリストから特定してください。
+3. 必要な情報が揃ったら、最終的な情報をJSON形式で提供してください。
 # 既存のタスクリスト
 ${JSON.stringify(existingTasks, null, 2)}
 # レスポンス形式
@@ -167,7 +169,12 @@ ${context || "なし"}
       `https://generativelanguage.googleapis.com/v1beta/models/${AIMODEL}:generateContent?key=` + process.env.REACT_APP_GEMINI_API_KEY,
       {
         contents: [{ role: "user", parts: [{ text: extractionPrompt }] }],
-        safetySettings: [ /* 安全性設定は省略 */ ]
+        safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
       },
       { headers: { 'Content-Type': 'application/json' } }
     );
@@ -199,7 +206,7 @@ ${context || "なし"}
 - 全てのタスクを総合的に評価してください。特に、期限(dueDate)、タスク内容の重要性を考慮してください。
 - **新たに追加されたタスク（IDが 'temp-' で始まるもの）** を含め、全てのタスクの優先度が自然なバランスになるように調整してください。
 - aiPriorityは必ず1（最も低い）〜100（最も高い）の範囲の整数にしてください。
-- レスポンスは、**元のタスクIDを維持したJSON配列**の形式で、全てのタスクを返してください。日本語は使わないでください。
+- レスポンスは、**元のタスクIDを維持したJSON配列**の形式で、全てのタスクを返してください。
 # 評価・修正対象のタスクリスト
 ${JSON.stringify(updatedTaskList, null, 2)}
 # レスポンス形式の例
@@ -213,7 +220,12 @@ ${JSON.stringify(updatedTaskList, null, 2)}
         `https://generativelanguage.googleapis.com/v1beta/models/${AIMODEL}:generateContent?key=` + process.env.REACT_APP_GEMINI_API_KEY,
         {
           contents: [{ role: "user", parts: [{ text: reRankingPrompt }] }],
-          safetySettings: [ /* 安全性設定は省略 */ ]
+          safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+          ]
         },
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -252,4 +264,4 @@ app.get('/healthz', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`APIサーバーがポート ${PORT} で起動しました`));
+app.listen(PORT, () => console.log(`API server started on port ${PORT}.`));

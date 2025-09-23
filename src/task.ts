@@ -1,6 +1,7 @@
 import { db } from "./firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 
+export const DEFAULT_AIPRIORITY: number = 0;
 export const DEFAULT_USERPRIORITY: number = 0;
 
 // タスク保存
