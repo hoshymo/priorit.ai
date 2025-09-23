@@ -148,7 +148,7 @@ ${JSON.stringify(existingTasks, null, 2)}
     "task": "タスクのタイトル",
     "dueDate": "期限。絶対日時 YYYY-MM-DD HH:MM:SS 書式",
     "aiPriority": "1(最低) から 100(最高) までの整数値。他のタスクとの相対で決めてください",
-    "reason": "優先度の理由。ユーザーは日本人なので、必ず日本語で出力してください",
+    "reason": "優先度の理由",
     "tags": []
   }
 }
@@ -169,18 +169,17 @@ ${context || "なし"}
       `https://generativelanguage.googleapis.com/v1beta/models/${AIMODEL}:generateContent?key=` + process.env.REACT_APP_GEMINI_API_KEY,
       {
         contents: [{ role: "user", parts: [{ text: extractionPrompt }] }],
-        safetySettings: [ /* 安全性設定は省略 */ ]
+        safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+        ]
       },
       { headers: { 'Content-Type': 'application/json' } }
     );
     
     const firstResponseText = extractionResult.data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-
-
-    console.log(firstResponseText);
-    
-
     const jsonMatch = firstResponseText.match(/\{[\s\S]*\}/);
 
     if (!jsonMatch) {
@@ -221,7 +220,12 @@ ${JSON.stringify(updatedTaskList, null, 2)}
         `https://generativelanguage.googleapis.com/v1beta/models/${AIMODEL}:generateContent?key=` + process.env.REACT_APP_GEMINI_API_KEY,
         {
           contents: [{ role: "user", parts: [{ text: reRankingPrompt }] }],
-          safetySettings: [ /* 安全性設定は省略 */ ]
+          safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+          ]
         },
         { headers: { 'Content-Type': 'application/json' } }
       );
