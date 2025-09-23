@@ -252,4 +252,4 @@ app.get('/healthz', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`APIサーバーがポート ${PORT} で起動しました`));
+app.listen(PORT, () => console.log(`API server started on port ${PORT}.`));
